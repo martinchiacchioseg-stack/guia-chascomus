@@ -1,0 +1,347 @@
+import http from 'http';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { getDb, saveDb } from './db.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const DEFAULT_PORT = process.env.PORT || 3000;
+const PUBLIC_DIR = path.join(__dirname, 'public');
+const UPLOADS_DIR = path.join(PUBLIC_DIR, 'uploads');
+
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+
+const MIME_TYPES = {
+  '.html': 'text/html; charset=utf-8',
+  '.css': 'text/css; charset=utf-8',
+  '.js': 'application/javascript; charset=utf-8',
+  '.json': 'application/json; charset=utf-8',
+  '.png': 'image/png',
+  '.jpg': 'image/jpeg',
+  '.jpeg': 'image/jpeg',
+  '.webp': 'image/webp',
+  '.gif': 'image/gif',
+  '.svg': 'image/svg+xml',
+  '.ico': 'image/x-icon'
+};
+
+function getRequestBody(req) {
+  return new Promise((resolve, reject) => {
+    let body = '';
+    req.on('data', chunk => { body += chunk.toString(); });
+    req.on('end', () => {
+      try {
+        resolve(body ? JSON.parse(body) : {});
+      } catch (err) {
+        resolve({});
+      }
+    });
+    req.on('error', err => reject(err));
+  });
+}
+
+function sendJson(res, data, status = 200) {
+  res.writeHead(status, {
+    'Content-Type': 'application/json; charset=utf-8',
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS'
+  });
+  res.end(JSON.stringify(data));
+}
+
+const server = http.createServer(async (req, res) => {
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204, {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS'
+    });
+    return res.end();
+  }
+
+  const reqUrl = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+  const pathname = reqUrl.pathname;
+  const method = req.method;
+
+  // ---------------- API PÚBLICAS ---------------- //
+
+  if (pathname === '/api/rubros' && method === 'GET') {
+    const db = getDb();
+    return sendJson(res, db.rubros || []);
+  }
+
+  if (pathname === '/api/pharmacies' && method === 'GET') {
+    const db = getDb();
+    return sendJson(res, db.farmacias || []);
+  }
+
+  if (pathname === '/api/ads' && method === 'GET') {
+    const db = getDb();
+    return sendJson(res, db.anuncios || {});
+  }
+
+  if (pathname === '/api/listings' && method === 'GET') {
+    const db = getDb();
+    let listings = db.listings || [];
+    const rubro = reqUrl.searchParams.get('rubro');
+    const q = reqUrl.searchParams.get('q');
+    const plan = reqUrl.searchParams.get('plan');
+
+    if (rubro && rubro !== 'todos') {
+      listings = listings.filter(l => l.rubroId === rubro);
+    }
+
+    if (q) {
+      const term = q.toLowerCase().trim();
+      listings = listings.filter(l => 
+        l.nombre.toLowerCase().includes(term) ||
+        l.descripcion.toLowerCase().includes(term) ||
+        (l.rubroNombre && l.rubroNombre.toLowerCase().includes(term)) ||
+        (l.direccion && l.direccion.toLowerCase().includes(term))
+      );
+    }
+
+    if (plan) {
+      listings = listings.filter(l => l.plan === plan);
+    }
+
+    listings.sort((a, b) => {
+      if (a.plan === 'destacado' && b.plan !== 'destacado') return -1;
+      if (a.plan !== 'destacado' && b.plan === 'destacado') return 1;
+      return (b.id || '').localeCompare(a.id || '');
+    });
+
+    return sendJson(res, listings);
+  }
+
+  if (pathname === '/api/submissions' && method === 'POST') {
+    const body = await getRequestBody(req);
+    const { nombre, rubroId, direccion, telefono, whatsapp, contactoNombre, descripcion } = body;
+    
+    if (!nombre || !telefono) {
+      return sendJson(res, { error: 'El nombre y teléfono son obligatorios.' }, 400);
+    }
+
+    const db = getDb();
+    const rubroObj = db.rubros.find(r => r.id === rubroId) || { nombre: 'Otro' };
+
+    const newSub = {
+      id: 'sub_' + Date.now(),
+      nombre,
+      rubroId,
+      rubroNombre: rubroObj.nombre,
+      direccion: direccion || 'Chascomús',
+      telefono,
+      whatsapp: whatsapp || ('549' + telefono.replace(/\D/g, '')),
+      contactoNombre: contactoNombre || nombre,
+      descripcion: descripcion || '',
+      planDeseado: 'gratuito',
+      estado: 'pendiente',
+      fecha: new Date().toISOString().replace('T', ' ').substring(0, 16)
+    };
+
+    db.submissions.unshift(newSub);
+    saveDb(db);
+
+    return sendJson(res, { success: true, message: '¡Solicitud recibida con éxito! El administrador la revisará a la brevedad.' });
+  }
+
+  // ---------------- API ADMIN ---------------- //
+
+  if (pathname === '/api/admin/login' && method === 'POST') {
+    const body = await getRequestBody(req);
+    const db = getDb();
+    if (body.password === db.adminPassword) {
+      return sendJson(res, { success: true, token: 'session_admin_chascomus_token_2026' });
+    }
+    return sendJson(res, { success: false, error: 'Contraseña incorrecta' }, 401);
+  }
+
+  const authHeader = req.headers.authorization;
+  const isAdminAuthorized = authHeader === 'Bearer session_admin_chascomus_token_2026';
+
+  if (pathname.startsWith('/api/admin/')) {
+    if (!isAdminAuthorized) {
+      return sendJson(res, { error: 'No autorizado' }, 403);
+    }
+
+    // Subir imagen desde la computadora (Base64)
+    if (pathname === '/api/admin/upload' && method === 'POST') {
+      const body = await getRequestBody(req);
+      const { filename, data } = body;
+
+      if (!data || !filename) {
+        return sendJson(res, { error: 'Nombre y datos de archivo requeridos' }, 400);
+      }
+
+      try {
+        const matches = data.match(/^data:([A-Za-z-+\/]+);base64,(.+)$/);
+        let buffer;
+
+        if (matches && matches.length === 3) {
+          buffer = Buffer.from(matches[2], 'base64');
+        } else {
+          buffer = Buffer.from(data, 'base64');
+        }
+
+        const ext = path.extname(filename) || '.jpg';
+        const cleanName = 'img_' + Date.now() + ext;
+        const savePath = path.join(UPLOADS_DIR, cleanName);
+
+        fs.writeFileSync(savePath, buffer);
+
+        const publicUrl = '/uploads/' + cleanName;
+        return sendJson(res, { success: true, url: publicUrl });
+      } catch (err) {
+        console.error('Error guardando imagen subida:', err);
+        return sendJson(res, { error: 'Error procesando la imagen' }, 500);
+      }
+    }
+
+    if (pathname === '/api/admin/password' && method === 'PUT') {
+      const body = await getRequestBody(req);
+      if (!body.newPassword || body.newPassword.trim().length < 4) {
+        return sendJson(res, { error: 'La nueva contraseña debe tener al menos 4 caracteres.' }, 400);
+      }
+      const db = getDb();
+      db.adminPassword = body.newPassword.trim();
+      saveDb(db);
+      return sendJson(res, { success: true, message: '¡Contraseña actualizada correctamente!' });
+    }
+
+    if (pathname === '/api/admin/pending' && method === 'GET') {
+      const db = getDb();
+      const pending = (db.submissions || []).filter(s => s.estado === 'pendiente');
+      return sendJson(res, pending);
+    }
+
+    if (pathname.startsWith('/api/admin/submissions/') && pathname.endsWith('/approve') && method === 'POST') {
+      const parts = pathname.split('/');
+      const id = parts[4];
+      const body = await getRequestBody(req);
+      const db = getDb();
+
+      const subIndex = db.submissions.findIndex(s => s.id === id);
+      if (subIndex !== -1) {
+        const sub = db.submissions[subIndex];
+        sub.estado = 'aprobado';
+
+        const newListing = {
+          id: 'l_' + Date.now(),
+          nombre: sub.nombre,
+          rubroId: sub.rubroId,
+          rubroNombre: sub.rubroNombre,
+          plan: body.plan || 'gratuito',
+          direccion: sub.direccion,
+          telefono: sub.telefono,
+          whatsapp: sub.whatsapp,
+          descripcion: sub.descripcion,
+          horarios: 'Consultar por teléfono',
+          redes: '',
+          fotos: [],
+          verificado: true,
+          fechaAlta: new Date().toISOString().substring(0, 10)
+        };
+
+        db.listings.unshift(newListing);
+        saveDb(db);
+        return sendJson(res, { success: true, listing: newListing });
+      }
+      return sendJson(res, { error: 'No encontrado' }, 404);
+    }
+
+    if (pathname.startsWith('/api/admin/submissions/') && pathname.endsWith('/reject') && method === 'POST') {
+      const parts = pathname.split('/');
+      const id = parts[4];
+      const db = getDb();
+      const subIndex = db.submissions.findIndex(s => s.id === id);
+      if (subIndex !== -1) {
+        db.submissions[subIndex].estado = 'rechazado';
+        saveDb(db);
+      }
+      return sendJson(res, { success: true });
+    }
+
+    if (pathname.startsWith('/api/admin/listings/') && method === 'PUT') {
+      const id = pathname.split('/')[4];
+      const body = await getRequestBody(req);
+      const db = getDb();
+      const idx = db.listings.findIndex(l => l.id === id);
+      if (idx !== -1) {
+        db.listings[idx] = { ...db.listings[idx], ...body };
+        saveDb(db);
+        return sendJson(res, { success: true, listing: db.listings[idx] });
+      }
+      return sendJson(res, { error: 'No encontrado' }, 404);
+    }
+
+    if (pathname.startsWith('/api/admin/listings/') && method === 'DELETE') {
+      const id = pathname.split('/')[4];
+      const db = getDb();
+      db.listings = db.listings.filter(l => l.id !== id);
+      saveDb(db);
+      return sendJson(res, { success: true });
+    }
+
+    if (pathname === '/api/admin/pharmacies' && method === 'PUT') {
+      const body = await getRequestBody(req);
+      const db = getDb();
+      db.farmacias = body.farmacias || [];
+      saveDb(db);
+      return sendJson(res, { success: true, farmacias: db.farmacias });
+    }
+
+    if (pathname === '/api/admin/ads' && method === 'PUT') {
+      const body = await getRequestBody(req);
+      const db = getDb();
+      db.anuncios = body.anuncios || {};
+      saveDb(db);
+      return sendJson(res, { success: true, anuncios: db.anuncios });
+    }
+  }
+
+  // ---------------- ARCHIVOS ESTÁTICOS FRONTEND ---------------- //
+
+  let filePath = path.join(PUBLIC_DIR, pathname === '/' ? 'index.html' : pathname);
+  
+  fs.stat(filePath, (err, stats) => {
+    if (err || !stats.isFile()) {
+      filePath = path.join(PUBLIC_DIR, 'index.html');
+    }
+
+    const ext = path.extname(filePath).toLowerCase();
+    const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+
+    fs.readFile(filePath, (readErr, content) => {
+      if (readErr) {
+        res.writeHead(500);
+        return res.end('Error del servidor');
+      }
+      res.writeHead(200, { 'Content-Type': contentType });
+      res.end(content);
+    });
+  });
+});
+
+function listenOnAvailablePort(currentPort) {
+  server.listen(currentPort, () => {
+    console.log(`====================================================`);
+    console.log(`🚀 GUÍA CHASCOMÚS CORRIENDO EN PUERTO ${currentPort}`);
+    console.log(`👉 http://localhost:${currentPort}`);
+    console.log(`====================================================`);
+  }).on('error', (err) => {
+    if (err.code === 'EADDRINUSE') {
+      console.log(`El puerto ${currentPort} está en uso, probando en http://localhost:${currentPort + 1}...`);
+      listenOnAvailablePort(currentPort + 1);
+    } else {
+      console.error('Error al iniciar el servidor:', err);
+    }
+  });
+}
+
+listenOnAvailablePort(Number(DEFAULT_PORT));
