@@ -29,8 +29,9 @@ const INITIAL_DATA = {
       nombre: 'Farmacia Pasteur',
       direccion: 'Av. Lastra 234, Chascomús',
       telefono: '2241-421111',
-      horario: 'De Turno (08:30 a 08:30 hs)',
-      deTurno: true,
+      horario: 'Turno 24 hs (08:00 a 08:00 hs)',
+      deTurno: false,
+      fechasTurno: ['10/08', '13/08', '20/08', '27/08'],
       diasTurno: ['Lunes', 'Miércoles', 'Viernes', 'Domingo'],
       mapsUrl: 'https://maps.google.com/?q=Farmacia+Pasteur+Chascomus'
     },
@@ -39,8 +40,9 @@ const INITIAL_DATA = {
       nombre: 'Farmacia San Martín',
       direccion: 'Calle Libres del Sur 145, Chascomús',
       telefono: '2241-432222',
-      horario: 'De Turno (08:30 a 08:30 hs)',
-      deTurno: true,
+      horario: 'Turno 24 hs (08:00 a 08:00 hs)',
+      deTurno: false,
+      fechasTurno: ['11/08', '18/08', '25/08'],
       diasTurno: ['Martes', 'Jueves', 'Sábado'],
       mapsUrl: 'https://maps.google.com/?q=Farmacia+San+Martin+Chascomus'
     },
@@ -48,9 +50,10 @@ const INITIAL_DATA = {
       id: 'f3',
       nombre: 'Farmacia Central',
       direccion: 'Av. Presidente Perón 89, Chascomús',
-      telefono: '2241-425555',
+      telefono: '',
       horario: 'Atención Regular (08:00 a 20:00 hs)',
       deTurno: false,
+      fechasTurno: [],
       diasTurno: [],
       mapsUrl: 'https://maps.google.com/?q=Farmacia+Central+Chascomus'
     }
@@ -85,7 +88,7 @@ const INITIAL_DATA = {
       nombre: 'Pizzería & Restaurante La Laguna',
       rubroId: 'gastronomia',
       rubroNombre: 'Gastronomía & Comidas',
-      plan: 'oro', // 'gratuito', 'plata', 'oro'
+      plan: 'oro',
       posicionTop: true,
       colorPersonalizado: '#f59e0b',
       direccion: 'Av. Costanera España 450, Chascomús',
