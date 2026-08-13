@@ -16,8 +16,12 @@ const INITIAL_DATA = {
     { id: 'plomeria', nombre: 'Plomería & Gas Matriculado', icono: '🚰', color: '#16a085' },
     { id: 'electricidad', nombre: 'Electricidad & Iluminación', icono: '⚡', color: '#f1c40f' },
     { id: 'mecanica', nombre: 'Mecánica & Repuestos', icono: '🚗', color: '#7f8c8d' },
-    { id: 'salud', nombre: 'Salud & Médicos', icono: '🩺', color: '#2ecc71' },
-    { id: 'servicios', nombre: 'Servicios para el Hogar', icono: '🏠', color: '#34495e' }
+    { id: 'remises', nombre: 'Remises & Traslados', icono: '🚕', color: '#f39c12' },
+    { id: 'veterinarias', nombre: 'Veterinarias & Mascotas', icono: '🐶', color: '#2ecc71' },
+    { id: 'inmobiliarias', nombre: 'Inmobiliarias & Alquileres', icono: '🏠', color: '#34495e' },
+    { id: 'turismo', nombre: 'Cabañas, Hoteles & Turismo', icono: '🏨', color: '#9b59b6' },
+    { id: 'salud', nombre: 'Salud & Médicos', icono: '🩺', color: '#1abc9c' },
+    { id: 'servicios', nombre: 'Servicios para el Hogar', icono: '🛠️', color: '#34495e' }
   ],
   farmacias: [
     {
@@ -51,24 +55,30 @@ const INITIAL_DATA = {
       mapsUrl: 'https://maps.google.com/?q=Farmacia+Central+Chascomus'
     }
   ],
-  anuncios: {
-    popup: {
+  popups: [
+    {
+      id: 'pop_main',
+      ubicacion: 'portada', // 'portada' o rubroId
       activo: true,
       titulo: '¡SÚPER PROMO FIN DE SEMANA EN LAGUNA!',
       subtitulo: 'Heladería El Faro - 2x1 en Kilo de Helado',
       descripcion: 'Vení a disfrutar de la mejor vista a la laguna con nuestros helados artesanales. Presentá este anuncio y llevate 2x1 este sábado y domingo.',
       imagen: 'https://images.unsplash.com/photo-1570197788417-0e82375c9371?w=800&auto=format&fit=crop&q=80',
-      botonTexto: 'Ver Ubicación & Promociones',
+      botonTexto: 'Ver Promociones',
       link: 'https://wa.me/5492241527357?text=Hola,%20vi%20la%20promo%20en%20la%20Guia%20Chascomus'
     },
-    bannerRubro: {
+    {
+      id: 'pop_gastro',
+      ubicacion: 'gastronomia',
       activo: true,
-      rubroId: 'gastronomia',
-      titulo: 'Pizzería & Chopería La Laguna',
-      texto: 'Delivery sin cargo en todo Chascomús. ¡Pedí por WhatsApp!',
-      telefono: '2241-554433'
+      titulo: '🍕 NOCHE DE PIZZAS EN LA LAGUNA',
+      subtitulo: '10% OFF en Delivery de Pizzas a la Piedra',
+      descripcion: 'Pizzas caseras horneadas al momento. Pedí por WhatsApp ingresando tu dirección en Chascomús.',
+      imagen: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=800&auto=format&fit=crop&q=80',
+      botonTexto: 'Pedir por WhatsApp',
+      link: 'https://wa.me/5492241527357?text=Hola,%20quiero%20pedir%20pizza'
     }
-  },
+  ],
   listings: [
     {
       id: 'l1',
@@ -78,7 +88,7 @@ const INITIAL_DATA = {
       plan: 'destacado',
       direccion: 'Av. Costanera España 450, Chascomús',
       telefono: '2241-554433',
-      whatsapp: '5492241554433',
+      whatsapp: '5492241527357',
       descripcion: 'Especialidad en pizzas a la piedra, empanadas caseras, minutas y la mejor vista a la laguna de Chascomús. Envíos a domicilio sin cargo.',
       horarios: 'Lunes a Domingo de 19:30 a 01:00 hs',
       redes: 'Instagram: @lalaguna.chascomus',
@@ -97,7 +107,7 @@ const INITIAL_DATA = {
       plan: 'destacado',
       direccion: 'Calle Lincoln 320, Chascomús',
       telefono: '2241-667788',
-      whatsapp: '5492241667788',
+      whatsapp: '5492241527357',
       descripcion: 'Diseño y fabricación de placares, muebles de cocina, aberturas y restauración de muebles antiguos. Presupuestos sin cargo en Chascomús.',
       horarios: 'Lunes a Viernes de 08:00 a 17:00 hs',
       redes: 'Facebook: Carpinteria El Roble Chascomus',
@@ -115,7 +125,7 @@ const INITIAL_DATA = {
       plan: 'gratuito',
       direccion: 'Calle Italia 120, Chascomús',
       telefono: '2241-423344',
-      whatsapp: '5492241423344',
+      whatsapp: '5492241527357',
       descripcion: 'Herramientas, buloneria, pintura, artículos de plomería y electricidad. Aceptamos todas las tarjetas y Cuenta DNI.',
       horarios: 'Lunes a Sábado de 08:00 a 19:30 hs',
       redes: '',
@@ -131,7 +141,7 @@ const INITIAL_DATA = {
       plan: 'gratuito',
       direccion: 'Chascomús y zonas rurales',
       telefono: '2241-612345',
-      whatsapp: '5492241612345',
+      whatsapp: '5492241527357',
       descripcion: 'Urgencias 24 hs. Instalaciones de agua, cloacas, colocación de sanitarios, termotanques y reparaciones de gas.',
       horarios: 'Urgencias 24 Horas',
       redes: '',
@@ -147,7 +157,7 @@ const INITIAL_DATA = {
       plan: 'gratuito',
       direccion: 'Chascomús',
       telefono: '2241-698765',
-      whatsapp: '5492241698765',
+      whatsapp: '5492241527357',
       descripcion: 'Obras de cero, refacciones, colocación de cerámicos, revoques, losas y pintura en general. Trabajos garantizados.',
       horarios: 'Lunes a Sábado de 07:30 a 18:00 hs',
       redes: '',
@@ -156,22 +166,7 @@ const INITIAL_DATA = {
       fechaAlta: '2026-08-05'
     }
   ],
-  submissions: [
-    {
-      id: 'sub_101',
-      nombre: 'Taller Mecánico El Gaucho',
-      rubroId: 'mecanica',
-      rubroNombre: 'Mecánica & Repuestos',
-      direccion: 'Av. Juan Manuel de Rosas 890, Chascomús',
-      telefono: '2241-511223',
-      whatsapp: '5492241511223',
-      contactoNombre: 'Carlos Gómez',
-      descripcion: 'Inyección electrónica, frenos, tren delantero y cambio de aceite. Diagnóstico computarizado.',
-      planDeseado: 'gratuito',
-      estado: 'pendiente',
-      fecha: '2026-08-10 18:30'
-    }
-  ],
+  submissions: [],
   adminPassword: 'admin123',
   whatsappAdmin: '5492241527357'
 };
@@ -183,8 +178,9 @@ export function getDb() {
   try {
     const raw = fs.readFileSync(DATA_FILE, 'utf-8');
     const data = JSON.parse(raw);
-    // Asegurar que whatsappAdmin esté actualizado
-    data.whatsappAdmin = '5492241527357';
+    if (!data.popups) {
+      data.popups = INITIAL_DATA.popups;
+    }
     return data;
   } catch (err) {
     console.error('Error al leer la base de datos:', err);
