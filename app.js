@@ -101,6 +101,7 @@ function renderApp() {
     ${renderHero()}
     
     <main class="main-container">
+      ${renderPushAppBanners()}
       ${renderFarmaciasSection()}
       ${renderRubrosSection()}
       ${renderListingsSection()}
@@ -117,6 +118,36 @@ function renderApp() {
     ${state.showRubroFormModal ? renderRubroFormModal() : ''}
   `;
 }
+
+function renderPushAppBanners() {
+  const currentTarget = state.selectedRubro === 'todos' ? 'portada' : state.selectedRubro;
+  const activeBanners = state.popups.filter(p => p.activo && (p.tipo === 'banner_top' || p.tipo === 'push_app') && (p.ubicacion === currentTarget || p.ubicacion === 'portada'));
+  
+  if (activeBanners.length === 0) return '';
+
+  return activeBanners.map(b => {
+    if (sessionStorage.getItem(`banner_closed_${b.id}`)) return '';
+    return `
+      <div class="push-app-banner">
+        <div class="push-app-content">
+          <h4>📢 ${b.titulo}</h4>
+          <p>${b.subtitulo ? `<strong>${b.subtitulo}</strong> — ` : ''}${b.descripcion}</p>
+        </div>
+        <div class="push-app-actions">
+          <a href="${b.link || 'https://wa.me/5492241527357'}" target="_blank" class="btn btn-whatsapp" style="padding: 6px 14px; font-size: 0.85rem;">
+            ${b.botonTexto || 'Ver Promoción'}
+          </a>
+          <button onclick="window.closeBanner('${b.id}')" style="background: none; border: none; color: white; cursor: pointer; font-size: 1.1rem; padding: 4px 8px; opacity: 0.7;" title="Cerrar aviso">✕</button>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+window.closeBanner = function(id) {
+  sessionStorage.setItem(`banner_closed_${id}`, 'true');
+  renderApp();
+};
 
 function renderNavbar() {
   return `
@@ -502,12 +533,62 @@ function renderAdminModal() {
       </div>
 
       <div class="admin-fullscreen-body">
+        ${renderAdminStatsSummary()}
+        
         ${state.adminTab === 'pending' ? renderAdminPendingTab() : ''}
         ${state.adminTab === 'rubros' ? renderAdminRubrosTab() : ''}
         ${state.adminTab === 'listings' ? renderAdminListingsTab() : ''}
         ${state.adminTab === 'pharmacies' ? renderAdminPharmaciesTab() : ''}
         ${state.adminTab === 'ads' ? renderAdminAdsTab() : ''}
         ${state.adminTab === 'security' ? renderAdminSecurityTab() : ''}
+      </div>
+    </div>
+  `;
+}
+
+function renderAdminStatsSummary() {
+  const totalListings = state.listings.length;
+  const pagasCount = state.listings.filter(l => l.plan === 'oro' || l.plan === 'plata' || l.plan === 'destacado').length;
+  const pinnedCount = state.listings.filter(l => l.posicionTop).length;
+  const farmaciasTurnoCount = state.farmacias.filter(f => f.deTurno).length;
+  const activePopupsCount = state.popups.filter(p => p.activo).length;
+
+  return `
+    <div class="admin-stats-grid">
+      <div class="admin-stat-card">
+        <div class="admin-stat-icon">📩</div>
+        <div>
+          <div class="admin-stat-val">${state.pendingSubmissions.length}</div>
+          <div class="admin-stat-label">Solicitudes Pendientes</div>
+        </div>
+      </div>
+      <div class="admin-stat-card">
+        <div class="admin-stat-icon">📖</div>
+        <div>
+          <div class="admin-stat-val">${totalListings}</div>
+          <div class="admin-stat-label">Publicaciones (${pagasCount} Pagas)</div>
+        </div>
+      </div>
+      <div class="admin-stat-card">
+        <div class="admin-stat-icon">📌</div>
+        <div>
+          <div class="admin-stat-val">${pinnedCount}</div>
+          <div class="admin-stat-label">Primeras en la Fila</div>
+        </div>
+      </div>
+      <div class="admin-stat-card">
+        <div class="admin-stat-icon">💊</div>
+        <div>
+          <div class="admin-stat-val">${state.farmacias.length}</div>
+          <div class="admin-stat-label">Farmacias (${farmaciasTurnoCount} De Turno)</div>
+        </div>
+      </div>
+      <div class="admin-stat-card">
+        <div class="admin-stat-icon">📢</div>
+        <div>
+          <div class="admin-stat-val">${activePopupsCount}</div>
+          <div class="admin-stat-label">Push App / Anuncios</div>
+        </div>
       </div>
     </div>
   `;
@@ -600,8 +681,11 @@ function renderAdminRubrosTab() {
 function renderAdminListingsTab() {
   return `
     <div>
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-        <h4>Todas las Publicaciones Activas (${state.listings.length})</h4>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+        <div>
+          <h4 style="margin: 0;">Todas las Publicaciones Activas (${state.listings.length})</h4>
+          <small style="color: var(--text-muted);">Administrá qué publicaciones van primero en la fila, su plan (Gratuito / Plata / Oro VIP) y su resaltado.</small>
+        </div>
         <button class="btn btn-primary" onclick="window.openListingFormModal(null)">+ Nueva Publicación</button>
       </div>
 
@@ -609,29 +693,55 @@ function renderAdminListingsTab() {
         <table class="admin-table">
           <thead>
             <tr>
-              <th>Nombre</th>
+              <th>Nombre & Dirección</th>
               <th>Rubro</th>
-              <th>Plan</th>
-              <th>Posición</th>
-              <th>Acciones</th>
+              <th>Tipo de Plan</th>
+              <th>Prioridad / Posición</th>
+              <th>Resaltado</th>
+              <th>Acciones Rápidas</th>
             </tr>
           </thead>
           <tbody>
             ${state.listings.map(l => `
               <tr>
-                <td><strong>${l.nombre}</strong><br><small>📍 ${l.direccion}</small></td>
+                <td>
+                  <strong>${l.nombre}</strong><br>
+                  <small style="color: var(--text-muted);">📍 ${l.direccion}</small>
+                </td>
                 <td>${l.rubroNombre}</td>
                 <td>
-                  <span style="padding: 4px 8px; border-radius: 4px; font-weight: 700; font-size: 0.75rem; background: ${l.plan === 'oro' || l.plan === 'destacado' ? 'var(--accent-gold-light)' : l.plan === 'plata' ? 'var(--primary-light)' : '#f1f5f9'}; color: ${l.plan === 'oro' || l.plan === 'destacado' ? 'var(--accent-gold)' : l.plan === 'plata' ? 'var(--primary-dark)' : 'var(--text-muted)'}">
-                    ${l.plan === 'oro' || l.plan === 'destacado' ? '⭐ ORO VIP' : l.plan === 'plata' ? '🔹 PLATA' : 'GRATIS'}
-                  </span>
+                  <select 
+                    onchange="window.changeListingPlan('${l.id}', this.value)" 
+                    style="font-size: 0.8rem; padding: 4px 8px; border-radius: 6px; font-weight: 700; border: 1px solid var(--border);"
+                  >
+                    <option value="gratuito" ${l.plan === 'gratuito' ? 'selected' : ''}>Plan Gratuito</option>
+                    <option value="plata" ${l.plan === 'plata' ? 'selected' : ''}>🔹 Plan Plata</option>
+                    <option value="oro" ${l.plan === 'oro' || l.plan === 'destacado' ? 'selected' : ''}>⭐ Plan Oro VIP</option>
+                  </select>
                 </td>
                 <td>
-                  ${l.posicionTop ? '<span style="color: purple; font-weight: 800;">📌 FIJADO TOP</span>' : 'Normal'}
+                  <button 
+                    class="btn ${l.posicionTop ? 'btn-primary' : 'btn-outline'}" 
+                    style="padding: 4px 10px; font-size: 0.78rem;" 
+                    onclick="window.toggleListingTop('${l.id}')"
+                  >
+                    ${l.posicionTop ? '📌 FIJADO TOP 1' : '📌 Fijar Primero'}
+                  </button>
                 </td>
                 <td>
-                  <button class="btn btn-outline" style="padding: 4px 8px; font-size: 0.8rem;" onclick="window.openListingFormModal('${l.id}')">✏️ Editar</button>
-                  <button class="btn btn-outline" style="padding: 4px 8px; font-size: 0.8rem; color: red;" onclick="window.deleteListing('${l.id}')">🗑️ Eliminar</button>
+                  <button 
+                    class="btn ${l.resaltado ? 'btn-whatsapp' : 'btn-outline'}" 
+                    style="padding: 4px 10px; font-size: 0.78rem;" 
+                    onclick="window.toggleListingResaltado('${l.id}')"
+                  >
+                    ${l.resaltado ? '✨ RESALTADO' : '✨ Resaltar'}
+                  </button>
+                </td>
+                <td>
+                  <div style="display: flex; gap: 6px;">
+                    <button class="btn btn-outline" style="padding: 4px 8px; font-size: 0.8rem;" onclick="window.openListingFormModal('${l.id}')">✏️ Editar</button>
+                    <button class="btn btn-outline" style="padding: 4px 8px; font-size: 0.8rem; color: red;" onclick="window.deleteListing('${l.id}')">🗑️ Borrar</button>
+                  </div>
                 </td>
               </tr>
             `).join('')}
@@ -693,9 +803,12 @@ function renderAdminPharmaciesTab() {
 function renderAdminAdsTab() {
   return `
     <div>
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-        <h4>Gestión de Pop-ups y Anuncios por Ubicación (Ilimitados)</h4>
-        <button class="btn btn-primary" onclick="window.openPopupFormModal(null)">+ Crear Nuevo Pop-up</button>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
+        <div>
+          <h4 style="margin: 0;">Gestión de Push App & Anuncios por Ubicación (Ilimitados)</h4>
+          <small style="color: var(--text-muted);">Creá anuncios pop-up o banners flotantes de notificación para el inicio o cualquier sección/categoría.</small>
+        </div>
+        <button class="btn btn-primary" onclick="window.openPopupFormModal(null)">+ Crear Nuevo Anuncio Push</button>
       </div>
 
       <div class="table-responsive">
@@ -703,7 +816,8 @@ function renderAdminAdsTab() {
           <thead>
             <tr>
               <th>Título del Anuncio</th>
-              <th>Ubicación exactas / Dónde aparece</th>
+              <th>Tipo de Formato</th>
+              <th>Ubicación Elegida / Dónde aparece</th>
               <th>Estado</th>
               <th>Imagen</th>
               <th>Acciones</th>
@@ -711,7 +825,7 @@ function renderAdminAdsTab() {
           </thead>
           <tbody>
             ${state.popups.map(p => {
-              let nombreUbicacion = '🏠 Portada Principal';
+              let nombreUbicacion = '🏠 Portada / Inicio';
               if (p.ubicacion.startsWith('pharmacy_')) {
                 const pId = p.ubicacion.replace('pharmacy_', '');
                 const farm = state.farmacias.find(f => f.id === pId);
@@ -721,9 +835,16 @@ function renderAdminAdsTab() {
                 nombreUbicacion = `📁 Rubro: ${rubroObj ? rubroObj.nombre : p.ubicacion}`;
               }
 
+              const isBanner = p.tipo === 'banner_top' || p.tipo === 'push_app';
+
               return `
                 <tr>
-                  <td><strong>${p.titulo}</strong><br><small>${p.subtitulo || ''}</small></td>
+                  <td><strong>${p.titulo}</strong><br><small style="color: var(--text-muted);">${p.subtitulo || ''}</small></td>
+                  <td>
+                    <span style="font-weight: 700; font-size: 0.78rem; padding: 4px 8px; border-radius: 4px; background: ${isBanner ? '#e0f2fe' : '#fef3c7'}; color: ${isBanner ? '#0369a1' : '#b45309'};">
+                      ${isBanner ? '📢 Push Banner Flotante' : '📱 Pop-up Emergente'}
+                    </span>
+                  </td>
                   <td><span style="font-weight: 700; color: var(--primary);">${nombreUbicacion}</span></td>
                   <td>
                     <span style="color: ${p.activo ? 'green' : 'gray'}; font-weight: 700;">
@@ -734,15 +855,17 @@ function renderAdminAdsTab() {
                     ${p.imagen ? `<img src="${p.imagen}" style="width: 50px; height: 35px; object-fit: cover; border-radius: 4px;" />` : 'Sin foto'}
                   </td>
                   <td>
-                    <button class="btn btn-outline" style="font-size: 0.8rem;" onclick="window.togglePopupActive('${p.id}')">
-                      ${p.activo ? 'Pausar' : 'Activar'}
-                    </button>
-                    <button class="btn btn-outline" style="font-size: 0.8rem;" onclick="window.openPopupFormModal('${p.id}')">
-                      ✏️ Editar
-                    </button>
-                    <button class="btn btn-outline" style="font-size: 0.8rem; color: red;" onclick="window.deletePopup('${p.id}')">
-                      🗑️ Borrar
-                    </button>
+                    <div style="display: flex; gap: 6px;">
+                      <button class="btn btn-outline" style="font-size: 0.8rem; padding: 4px 8px;" onclick="window.togglePopupActive('${p.id}')">
+                        ${p.activo ? 'Pausar' : 'Activar'}
+                      </button>
+                      <button class="btn btn-outline" style="font-size: 0.8rem; padding: 4px 8px;" onclick="window.openPopupFormModal('${p.id}')">
+                        ✏️ Editar
+                      </button>
+                      <button class="btn btn-outline" style="font-size: 0.8rem; padding: 4px 8px; color: red;" onclick="window.deletePopup('${p.id}')">
+                        🗑️ Borrar
+                      </button>
+                    </div>
                   </td>
                 </tr>
               `;
@@ -958,13 +1081,21 @@ function renderPopupFormModal() {
     <div class="modal-overlay">
       <div class="form-modal-content">
         <button class="modal-close-btn" onclick="window.closePopupFormModal()">✕</button>
-        <h3>${isEdit ? 'Editar Anuncio Pop-up' : 'Crear Nuevo Anuncio Pop-up'}</h3>
+        <h3>${isEdit ? 'Editar Anuncio Push App / Pop-up' : 'Crear Nuevo Anuncio Push App / Pop-up'}</h3>
 
         <form onsubmit="window.savePopupForm(event)">
           <div class="form-group">
-            <label>¿Dónde debe aparecer este Pop-up publicitario? *</label>
+            <label>Tipo de Formato del Anuncio *</label>
+            <select id="editPopTipo" required>
+              <option value="popup" ${p.tipo === 'popup' || !p.tipo ? 'selected' : ''}>📱 Pop-up Emergente (Ventana emergente al abrir)</option>
+              <option value="banner_top" ${p.tipo === 'banner_top' || p.tipo === 'push_app' ? 'selected' : ''}>📢 Push Banner Flotante (Notificación superior al inicio o sección)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>¿Dónde debe aparecer este Anuncio? (Ubicación Personalizada) *</label>
             <select id="editPopUbicacion" required>
-              <option value="portada" ${p.ubicacion === 'portada' ? 'selected' : ''}>🏠 Portada Principal (Al abrir la aplicación)</option>
+              <option value="portada" ${p.ubicacion === 'portada' ? 'selected' : ''}>🏠 Portada Principal / Inicio</option>
               <optgroup label="📁 Al entrar a una Categoría o Rubro específico">
                 ${state.rubros.map(r => `<option value="${r.id}" ${p.ubicacion === r.id ? 'selected' : ''}>📁 Rubro: ${r.nombre}</option>`).join('')}
               </optgroup>
@@ -980,7 +1111,7 @@ function renderPopupFormModal() {
           </div>
 
           <div class="form-group">
-            <label>Subtítulo / Promo</label>
+            <label>Subtítulo / Nombre del Comercio</label>
             <input type="text" id="editPopSubtitulo" value="${p.subtitulo || ''}" placeholder="Ej: Pizzería La Laguna" />
           </div>
 
@@ -990,18 +1121,18 @@ function renderPopupFormModal() {
           </div>
 
           <div class="form-group" style="background: #f1f5f9; padding: 14px; border-radius: var(--radius-md);">
-            <label style="font-weight: 700;">📷 Imagen del Pop-up (Subir desde la compu)</label>
+            <label style="font-weight: 700;">📷 Imagen del Anuncio (Opcional, Subir desde la compu)</label>
             <input type="file" id="popFileInput" accept="image/*" onchange="window.handlePopupFileUpload(event)" style="margin-top: 6px; margin-bottom: 8px;" />
             <input type="text" id="editPopImagen" value="${p.imagen || ''}" placeholder="/uploads/mi_foto.jpg o URL" />
           </div>
 
           <div class="form-group">
-            <label>Texto del Botón</label>
-            <input type="text" id="editPopBotonTexto" value="${p.botonTexto || 'Ver Promociones'}" />
+            <label>Texto del Botón de Acción</label>
+            <input type="text" id="editPopBotonTexto" value="${p.botonTexto || 'Ver Promoción'}" />
           </div>
 
           <div class="form-group">
-            <label>Enlace del Botón (WhatsApp / Web)</label>
+            <label>Enlace del Botón (WhatsApp / Página Web)</label>
             <input type="text" id="editPopLink" value="${p.link || 'https://wa.me/5492241527357'}" />
           </div>
 
@@ -1014,7 +1145,7 @@ function renderPopupFormModal() {
 
           <div style="display: flex; gap: 10px; margin-top: 20px;">
             <button type="button" class="btn btn-outline" style="flex:1;" onclick="window.closePopupFormModal()">Cancelar</button>
-            <button type="submit" class="btn btn-primary" style="flex:1;">${isEdit ? 'Guardar Cambios' : 'Crear Pop-up'}</button>
+            <button type="submit" class="btn btn-primary" style="flex:1;">${isEdit ? 'Guardar Cambios' : 'Crear Anuncio'}</button>
           </div>
         </form>
       </div>
@@ -1465,6 +1596,7 @@ window.savePopupForm = async function(e) {
   const isEdit = state.editingItem && state.editingItem.id;
 
   const body = {
+    tipo: document.getElementById('editPopTipo').value,
     ubicacion: document.getElementById('editPopUbicacion').value,
     titulo: document.getElementById('editPopTitulo').value,
     subtitulo: document.getElementById('editPopSubtitulo').value,
@@ -1489,7 +1621,55 @@ window.savePopupForm = async function(e) {
       window.closePopupFormModal();
     }
   } catch (err) {
-    alert('Error al guardar Pop-up');
+    alert('Error al guardar Anuncio');
+  }
+};
+
+window.toggleListingTop = async function(id) {
+  const listing = state.listings.find(l => l.id === id);
+  if (!listing) return;
+
+  try {
+    await fetch(`/api/admin/listings/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${state.adminToken}` },
+      body: JSON.stringify({ posicionTop: !listing.posicionTop })
+    });
+    await loadAppData();
+    renderApp();
+  } catch (err) {
+    alert('Error al cambiar posición de la publicación');
+  }
+};
+
+window.toggleListingResaltado = async function(id) {
+  const listing = state.listings.find(l => l.id === id);
+  if (!listing) return;
+
+  try {
+    await fetch(`/api/admin/listings/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${state.adminToken}` },
+      body: JSON.stringify({ resaltado: !listing.resaltado })
+    });
+    await loadAppData();
+    renderApp();
+  } catch (err) {
+    alert('Error al cambiar resplandor/resaltado');
+  }
+};
+
+window.changeListingPlan = async function(id, newPlan) {
+  try {
+    await fetch(`/api/admin/listings/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${state.adminToken}` },
+      body: JSON.stringify({ plan: newPlan })
+    });
+    await loadAppData();
+    renderApp();
+  } catch (err) {
+    alert('Error al actualizar plan de la publicación');
   }
 };
 
