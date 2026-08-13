@@ -1,5 +1,5 @@
 // ==========================================================================
-// GUÍA CHASCOMÚS - CLIENT APPLICATION LOGIC
+// GUÍA CHASCOMÚS - CLIENT APPLICATION LOGIC (v6.0 - Duty by Month Dates & Optional Phone)
 // Branding: Desarrollado por rolϕ
 // WhatsApp: 5492241527357
 // ==========================================================================
@@ -26,6 +26,55 @@ const state = {
   pendingSubmissions: [],
   whatsappAdmin: '5492241527357'
 };
+
+const DIAS_SEMANA = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+
+function getPharmDutyDateInfo() {
+  const now = new Date();
+  const hours = now.getHours();
+
+  let targetDate = new Date(now);
+  // Si son antes de las 08:00 AM, el turno pertenece al día anterior
+  if (hours < 8) {
+    targetDate.setDate(targetDate.getDate() - 1);
+  }
+
+  const d = String(targetDate.getDate()).padStart(2, '0');
+  const m = String(targetDate.getMonth() + 1).padStart(2, '0');
+  const y = targetDate.getFullYear();
+
+  return {
+    fullDate: `${d}/${m}/${y}`, // "13/08/2026"
+    shortDate: `${d}/${m}`,     // "13/08"
+    dayName: DIAS_SEMANA[targetDate.getDay()]
+  };
+}
+
+function isPharmDeTurnoToday(f) {
+  if (f.deTurno) return true;
+
+  const dutyInfo = getPharmDutyDateInfo();
+
+  // 1. Verificar fechas específicas del mes (ej: "10/08", "13/08", "25/08")
+  if (f.fechasTurno && Array.isArray(f.fechasTurno) && f.fechasTurno.length > 0) {
+    const isMatch = f.fechasTurno.some(fechaStr => {
+      const clean = String(fechaStr).trim().replace(/-/g, '/');
+      return clean === dutyInfo.fullDate || clean === dutyInfo.shortDate || clean.startsWith(dutyInfo.shortDate);
+    });
+    if (isMatch) return true;
+  }
+
+  // 2. Verificar por día de semana (ej: "Lunes", "Miércoles")
+  if (f.diasTurno && Array.isArray(f.diasTurno) && f.diasTurno.length > 0) {
+    const hoyNombre = dutyInfo.dayName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    return f.diasTurno.some(d => {
+      const dNorm = String(d).toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+      return dNorm === hoyNombre;
+    });
+  }
+
+  return false;
+}
 
 document.addEventListener('DOMContentLoaded', async () => {
   await loadAppData();
@@ -101,7 +150,6 @@ function renderApp() {
     ${renderHero()}
     
     <main class="main-container">
-      ${renderPushAppBanners()}
       ${renderFarmaciasSection()}
       ${renderRubrosSection()}
       ${renderListingsSection()}
@@ -118,36 +166,6 @@ function renderApp() {
     ${state.showRubroFormModal ? renderRubroFormModal() : ''}
   `;
 }
-
-function renderPushAppBanners() {
-  const currentTarget = state.selectedRubro === 'todos' ? 'portada' : state.selectedRubro;
-  const activeBanners = state.popups.filter(p => p.activo && (p.tipo === 'banner_top' || p.tipo === 'push_app') && (p.ubicacion === currentTarget || p.ubicacion === 'portada'));
-  
-  if (activeBanners.length === 0) return '';
-
-  return activeBanners.map(b => {
-    if (sessionStorage.getItem(`banner_closed_${b.id}`)) return '';
-    return `
-      <div class="push-app-banner">
-        <div class="push-app-content">
-          <h4>📢 ${b.titulo}</h4>
-          <p>${b.subtitulo ? `<strong>${b.subtitulo}</strong> — ` : ''}${b.descripcion}</p>
-        </div>
-        <div class="push-app-actions">
-          <a href="${b.link || 'https://wa.me/5492241527357'}" target="_blank" class="btn btn-whatsapp" style="padding: 6px 14px; font-size: 0.85rem;">
-            ${b.botonTexto || 'Ver Promoción'}
-          </a>
-          <button onclick="window.closeBanner('${b.id}')" style="background: none; border: none; color: white; cursor: pointer; font-size: 1.1rem; padding: 4px 8px; opacity: 0.7;" title="Cerrar aviso">✕</button>
-        </div>
-      </div>
-    `;
-  }).join('');
-}
-
-window.closeBanner = function(id) {
-  sessionStorage.setItem(`banner_closed_${id}`, 'true');
-  renderApp();
-};
 
 function renderNavbar() {
   return `
@@ -199,14 +217,15 @@ function renderHero() {
 }
 
 function renderFarmaciasSection() {
-  const deTurno = state.farmacias.filter(f => f.deTurno);
+  const dutyInfo = getPharmDutyDateInfo();
+  const deTurno = state.farmacias.filter(f => isPharmDeTurnoToday(f));
   if (deTurno.length === 0) return '';
 
   return `
     <section style="margin-bottom: 36px;">
       <div class="section-title">
-        <h3>💊 Farmacias de Turno en Chascomús</h3>
-        <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">Cronograma de atención rotativo</span>
+        <h3>💊 Farmacias de Turno HOY (${dutyInfo.dayName} ${dutyInfo.shortDate})</h3>
+        <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">Guardia 24hs: 08:00 AM a 08:00 AM del día siguiente</span>
       </div>
       
       <div class="pharmacy-card-grid">
@@ -215,24 +234,24 @@ function renderFarmaciasSection() {
           return `
             <div class="pharmacy-card" onclick="window.checkPharmacyPopup('${f.id}')" style="cursor: pointer;">
               <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                <div class="pharmacy-badge">🔴 DE TURNO HOY</div>
+                <div class="pharmacy-badge">🔴 DE TURNO HOY (${dutyInfo.shortDate})</div>
                 ${hasAd ? '<span style="font-size: 0.75rem; background: var(--accent-gold); color: white; padding: 2px 8px; border-radius: 99px; font-weight: 700;">📢 PROMO DISPONIBLE</span>' : ''}
               </div>
               <h4>${f.nombre}</h4>
               <div class="pharmacy-info">
                 <span>📍 ${f.direccion}</span>
-                <span>📞 Tel: <strong>${f.telefono}</strong></span>
-                <span>⏰ ${f.horario || 'Atención 24 hs'}</span>
-                ${f.diasTurno && f.diasTurno.length > 0 ? `
+                ${f.telefono ? `<span>📞 Tel: <strong>${f.telefono}</strong></span>` : ''}
+                <span>⏰ ${f.horario || 'Turno 24 hs (08:00 a 08:00 hs)'}</span>
+                ${f.fechasTurno && f.fechasTurno.length > 0 ? `
                   <div style="margin-top: 4px;">
-                    <strong>Días asignados:</strong><br>
-                    ${f.diasTurno.map(d => `<span class="day-badge">${d}</span>`).join('')}
+                    <strong>Fechas asignadas en el mes:</strong><br>
+                    ${f.fechasTurno.map(fecha => `<span class="day-badge" style="${fecha.includes(dutyInfo.shortDate) ? 'background: #ef4444; color: white;' : ''}">${fecha}</span>`).join('')}
                   </div>
                 ` : ''}
               </div>
               <div class="pharmacy-actions">
-                <a href="tel:${f.telefono}" class="btn btn-outline" style="flex:1;" onclick="event.stopPropagation(); window.checkPharmacyPopup('${f.id}');">📞 Llamar</a>
-                <a href="${f.mapsUrl}" target="_blank" class="btn btn-primary" style="flex:1;" onclick="event.stopPropagation(); window.checkPharmacyPopup('${f.id}');">📍 Cómo llegar</a>
+                ${f.telefono ? `<a href="tel:${f.telefono}" class="btn btn-outline" style="flex:1;" onclick="event.stopPropagation(); window.checkPharmacyPopup('${f.id}');">📞 Llamar</a>` : ''}
+                <a href="${f.mapsUrl || `https://maps.google.com/?q=${encodeURIComponent(f.nombre)}+Chascomus`}" target="_blank" class="btn btn-primary" style="flex:1;" onclick="event.stopPropagation(); window.checkPharmacyPopup('${f.id}');">📍 Cómo llegar</a>
               </div>
             </div>
           `;
@@ -495,6 +514,8 @@ function renderAdminModal() {
     `;
   }
 
+  const dutyInfo = getPharmDutyDateInfo();
+
   return `
     <div class="admin-fullscreen-modal">
       <div class="admin-fullscreen-header">
@@ -502,7 +523,7 @@ function renderAdminModal() {
           <div style="font-size: 1.6rem;">🏛️</div>
           <div>
             <h2 style="color: white; margin: 0; font-size: 1.3rem;">Panel de Administración — Guía Chascomús</h2>
-            <span style="font-size: 0.8rem; color: var(--accent-gold);">Modo Pantalla Completa — Gestión Integral</span>
+            <span style="font-size: 0.8rem; color: var(--accent-gold);">Turno Activo Hoy: <strong>${dutyInfo.dayName} ${dutyInfo.shortDate}</strong></span>
           </div>
         </div>
         <div style="display: flex; gap: 10px;">
@@ -533,62 +554,12 @@ function renderAdminModal() {
       </div>
 
       <div class="admin-fullscreen-body">
-        ${renderAdminStatsSummary()}
-        
         ${state.adminTab === 'pending' ? renderAdminPendingTab() : ''}
         ${state.adminTab === 'rubros' ? renderAdminRubrosTab() : ''}
         ${state.adminTab === 'listings' ? renderAdminListingsTab() : ''}
         ${state.adminTab === 'pharmacies' ? renderAdminPharmaciesTab() : ''}
         ${state.adminTab === 'ads' ? renderAdminAdsTab() : ''}
         ${state.adminTab === 'security' ? renderAdminSecurityTab() : ''}
-      </div>
-    </div>
-  `;
-}
-
-function renderAdminStatsSummary() {
-  const totalListings = state.listings.length;
-  const pagasCount = state.listings.filter(l => l.plan === 'oro' || l.plan === 'plata' || l.plan === 'destacado').length;
-  const pinnedCount = state.listings.filter(l => l.posicionTop).length;
-  const farmaciasTurnoCount = state.farmacias.filter(f => f.deTurno).length;
-  const activePopupsCount = state.popups.filter(p => p.activo).length;
-
-  return `
-    <div class="admin-stats-grid">
-      <div class="admin-stat-card">
-        <div class="admin-stat-icon">📩</div>
-        <div>
-          <div class="admin-stat-val">${state.pendingSubmissions.length}</div>
-          <div class="admin-stat-label">Solicitudes Pendientes</div>
-        </div>
-      </div>
-      <div class="admin-stat-card">
-        <div class="admin-stat-icon">📖</div>
-        <div>
-          <div class="admin-stat-val">${totalListings}</div>
-          <div class="admin-stat-label">Publicaciones (${pagasCount} Pagas)</div>
-        </div>
-      </div>
-      <div class="admin-stat-card">
-        <div class="admin-stat-icon">📌</div>
-        <div>
-          <div class="admin-stat-val">${pinnedCount}</div>
-          <div class="admin-stat-label">Primeras en la Fila</div>
-        </div>
-      </div>
-      <div class="admin-stat-card">
-        <div class="admin-stat-icon">💊</div>
-        <div>
-          <div class="admin-stat-val">${state.farmacias.length}</div>
-          <div class="admin-stat-label">Farmacias (${farmaciasTurnoCount} De Turno)</div>
-        </div>
-      </div>
-      <div class="admin-stat-card">
-        <div class="admin-stat-icon">📢</div>
-        <div>
-          <div class="admin-stat-val">${activePopupsCount}</div>
-          <div class="admin-stat-label">Push App / Anuncios</div>
-        </div>
       </div>
     </div>
   `;
@@ -681,11 +652,8 @@ function renderAdminRubrosTab() {
 function renderAdminListingsTab() {
   return `
     <div>
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
-        <div>
-          <h4 style="margin: 0;">Todas las Publicaciones Activas (${state.listings.length})</h4>
-          <small style="color: var(--text-muted);">Administrá qué publicaciones van primero en la fila, su plan (Gratuito / Plata / Oro VIP) y su resaltado.</small>
-        </div>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h4>Todas las Publicaciones Activas (${state.listings.length})</h4>
         <button class="btn btn-primary" onclick="window.openListingFormModal(null)">+ Nueva Publicación</button>
       </div>
 
@@ -693,55 +661,29 @@ function renderAdminListingsTab() {
         <table class="admin-table">
           <thead>
             <tr>
-              <th>Nombre & Dirección</th>
+              <th>Nombre</th>
               <th>Rubro</th>
-              <th>Tipo de Plan</th>
-              <th>Prioridad / Posición</th>
-              <th>Resaltado</th>
-              <th>Acciones Rápidas</th>
+              <th>Plan</th>
+              <th>Posición</th>
+              <th>Acciones</th>
             </tr>
           </thead>
           <tbody>
             ${state.listings.map(l => `
               <tr>
-                <td>
-                  <strong>${l.nombre}</strong><br>
-                  <small style="color: var(--text-muted);">📍 ${l.direccion}</small>
-                </td>
+                <td><strong>${l.nombre}</strong><br><small>📍 ${l.direccion}</small></td>
                 <td>${l.rubroNombre}</td>
                 <td>
-                  <select 
-                    onchange="window.changeListingPlan('${l.id}', this.value)" 
-                    style="font-size: 0.8rem; padding: 4px 8px; border-radius: 6px; font-weight: 700; border: 1px solid var(--border);"
-                  >
-                    <option value="gratuito" ${l.plan === 'gratuito' ? 'selected' : ''}>Plan Gratuito</option>
-                    <option value="plata" ${l.plan === 'plata' ? 'selected' : ''}>🔹 Plan Plata</option>
-                    <option value="oro" ${l.plan === 'oro' || l.plan === 'destacado' ? 'selected' : ''}>⭐ Plan Oro VIP</option>
-                  </select>
+                  <span style="padding: 4px 8px; border-radius: 4px; font-weight: 700; font-size: 0.75rem; background: ${l.plan === 'oro' || l.plan === 'destacado' ? 'var(--accent-gold-light)' : l.plan === 'plata' ? 'var(--primary-light)' : '#f1f5f9'}; color: ${l.plan === 'oro' || l.plan === 'destacado' ? 'var(--accent-gold)' : l.plan === 'plata' ? 'var(--primary-dark)' : 'var(--text-muted)'}">
+                    ${l.plan === 'oro' || l.plan === 'destacado' ? '⭐ ORO VIP' : l.plan === 'plata' ? '🔹 PLATA' : 'GRATIS'}
+                  </span>
                 </td>
                 <td>
-                  <button 
-                    class="btn ${l.posicionTop ? 'btn-primary' : 'btn-outline'}" 
-                    style="padding: 4px 10px; font-size: 0.78rem;" 
-                    onclick="window.toggleListingTop('${l.id}')"
-                  >
-                    ${l.posicionTop ? '📌 FIJADO TOP 1' : '📌 Fijar Primero'}
-                  </button>
+                  ${l.posicionTop ? '<span style="color: purple; font-weight: 800;">📌 FIJADO TOP</span>' : 'Normal'}
                 </td>
                 <td>
-                  <button 
-                    class="btn ${l.resaltado ? 'btn-whatsapp' : 'btn-outline'}" 
-                    style="padding: 4px 10px; font-size: 0.78rem;" 
-                    onclick="window.toggleListingResaltado('${l.id}')"
-                  >
-                    ${l.resaltado ? '✨ RESALTADO' : '✨ Resaltar'}
-                  </button>
-                </td>
-                <td>
-                  <div style="display: flex; gap: 6px;">
-                    <button class="btn btn-outline" style="padding: 4px 8px; font-size: 0.8rem;" onclick="window.openListingFormModal('${l.id}')">✏️ Editar</button>
-                    <button class="btn btn-outline" style="padding: 4px 8px; font-size: 0.8rem; color: red;" onclick="window.deleteListing('${l.id}')">🗑️ Borrar</button>
-                  </div>
+                  <button class="btn btn-outline" style="padding: 4px 8px; font-size: 0.8rem;" onclick="window.openListingFormModal('${l.id}')">✏️ Editar</button>
+                  <button class="btn btn-outline" style="padding: 4px 8px; font-size: 0.8rem; color: red;" onclick="window.deleteListing('${l.id}')">🗑️ Eliminar</button>
                 </td>
               </tr>
             `).join('')}
@@ -753,10 +695,12 @@ function renderAdminListingsTab() {
 }
 
 function renderAdminPharmaciesTab() {
+  const dutyInfo = getPharmDutyDateInfo();
+
   return `
     <div>
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-        <h4>Gestión Completa de Farmacias</h4>
+        <h4>Gestión Completa de Farmacias (${state.farmacias.length})</h4>
         <button class="btn btn-primary" onclick="window.openPharmacyFormModal(null)">+ Agregar Nueva Farmacia</button>
       </div>
 
@@ -766,33 +710,39 @@ function renderAdminPharmaciesTab() {
             <tr>
               <th>Farmacia</th>
               <th>Dirección & Teléfono</th>
-              <th>Días Asignados</th>
-              <th>Estado De Turno</th>
+              <th>Fechas del Mes / Días</th>
+              <th>Estado Ahora (${dutyInfo.shortDate})</th>
               <th>Acciones</th>
             </tr>
           </thead>
           <tbody>
-            ${state.farmacias.map(f => `
-              <tr>
-                <td><strong>${f.nombre}</strong></td>
-                <td>📍 ${f.direccion}<br>📞 ${f.telefono}</td>
-                <td>
-                  ${(f.diasTurno || []).map(d => `<span class="day-badge">${d}</span>`).join('') || '<em>Sin días asignados</em>'}
-                </td>
-                <td>
-                  <span style="color: ${f.deTurno ? 'green' : 'gray'}; font-weight: 700;">
-                    ${f.deTurno ? '🔴 DE TURNO HOY' : '⚪ REGULAR'}
-                  </span>
-                </td>
-                <td>
-                  <button class="btn btn-outline" style="font-size: 0.8rem;" onclick="window.togglePharmacyTurn('${f.id}')">
-                    ${f.deTurno ? 'Quitar Turno' : 'Poner De Turno'}
-                  </button>
-                  <button class="btn btn-outline" style="font-size: 0.8rem;" onclick="window.openPharmacyFormModal('${f.id}')">✏️ Editar</button>
-                  <button class="btn btn-outline" style="font-size: 0.8rem; color: red;" onclick="window.deletePharmacy('${f.id}')">🗑️ Borrar</button>
-                </td>
-              </tr>
-            `).join('')}
+            ${state.farmacias.map(f => {
+              const deTurnoHoy = isPharmDeTurnoToday(f);
+              const fechasStr = (f.fechasTurno || []).join(', ');
+              return `
+                <tr>
+                  <td><strong>${f.nombre}</strong></td>
+                  <td>📍 ${f.direccion}<br>${f.telefono ? '📞 ' + f.telefono : '<small style="color:var(--text-muted);">(Sin teléfono)</small>'}</td>
+                  <td>
+                    ${fechasStr ? `<div>📅 <strong>Fechas:</strong> ${fechasStr}</div>` : ''}
+                    ${(f.diasTurno || []).map(d => `<span class="day-badge" style="${d === dutyInfo.dayName ? 'background: #ef4444; color: white;' : ''}">${d}</span>`).join('')}
+                    ${!fechasStr && (!f.diasTurno || f.diasTurno.length === 0) ? '<em>Sin fechas asignadas</em>' : ''}
+                  </td>
+                  <td>
+                    <span style="color: ${deTurnoHoy ? 'green' : 'gray'}; font-weight: 700;">
+                      ${deTurnoHoy ? `🔴 DE TURNO (Hoy ${dutyInfo.shortDate})` : '⚪ REGULAR'}
+                    </span>
+                  </td>
+                  <td>
+                    <button class="btn btn-outline" style="font-size: 0.8rem;" onclick="window.togglePharmacyTurn('${f.id}')">
+                      ${f.deTurno ? 'Quitar Fuerza Turno' : 'Forzar Turno'}
+                    </button>
+                    <button class="btn btn-outline" style="font-size: 0.8rem;" onclick="window.openPharmacyFormModal('${f.id}')">✏️ Editar Fechas</button>
+                    <button class="btn btn-outline" style="font-size: 0.8rem; color: red;" onclick="window.deletePharmacy('${f.id}')">🗑️ Borrar</button>
+                  </td>
+                </tr>
+              `;
+            }).join('')}
           </tbody>
         </table>
       </div>
@@ -803,12 +753,9 @@ function renderAdminPharmaciesTab() {
 function renderAdminAdsTab() {
   return `
     <div>
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px;">
-        <div>
-          <h4 style="margin: 0;">Gestión de Push App & Anuncios por Ubicación (Ilimitados)</h4>
-          <small style="color: var(--text-muted);">Creá anuncios pop-up o banners flotantes de notificación para el inicio o cualquier sección/categoría.</small>
-        </div>
-        <button class="btn btn-primary" onclick="window.openPopupFormModal(null)">+ Crear Nuevo Anuncio Push</button>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h4>Gestión de Pop-ups y Anuncios por Ubicación (Ilimitados)</h4>
+        <button class="btn btn-primary" onclick="window.openPopupFormModal(null)">+ Crear Nuevo Pop-up</button>
       </div>
 
       <div class="table-responsive">
@@ -816,8 +763,7 @@ function renderAdminAdsTab() {
           <thead>
             <tr>
               <th>Título del Anuncio</th>
-              <th>Tipo de Formato</th>
-              <th>Ubicación Elegida / Dónde aparece</th>
+              <th>Ubicación exactas / Dónde aparece</th>
               <th>Estado</th>
               <th>Imagen</th>
               <th>Acciones</th>
@@ -825,7 +771,7 @@ function renderAdminAdsTab() {
           </thead>
           <tbody>
             ${state.popups.map(p => {
-              let nombreUbicacion = '🏠 Portada / Inicio';
+              let nombreUbicacion = '🏠 Portada Principal';
               if (p.ubicacion.startsWith('pharmacy_')) {
                 const pId = p.ubicacion.replace('pharmacy_', '');
                 const farm = state.farmacias.find(f => f.id === pId);
@@ -835,16 +781,9 @@ function renderAdminAdsTab() {
                 nombreUbicacion = `📁 Rubro: ${rubroObj ? rubroObj.nombre : p.ubicacion}`;
               }
 
-              const isBanner = p.tipo === 'banner_top' || p.tipo === 'push_app';
-
               return `
                 <tr>
-                  <td><strong>${p.titulo}</strong><br><small style="color: var(--text-muted);">${p.subtitulo || ''}</small></td>
-                  <td>
-                    <span style="font-weight: 700; font-size: 0.78rem; padding: 4px 8px; border-radius: 4px; background: ${isBanner ? '#e0f2fe' : '#fef3c7'}; color: ${isBanner ? '#0369a1' : '#b45309'};">
-                      ${isBanner ? '📢 Push Banner Flotante' : '📱 Pop-up Emergente'}
-                    </span>
-                  </td>
+                  <td><strong>${p.titulo}</strong><br><small>${p.subtitulo || ''}</small></td>
                   <td><span style="font-weight: 700; color: var(--primary);">${nombreUbicacion}</span></td>
                   <td>
                     <span style="color: ${p.activo ? 'green' : 'gray'}; font-weight: 700;">
@@ -855,17 +794,15 @@ function renderAdminAdsTab() {
                     ${p.imagen ? `<img src="${p.imagen}" style="width: 50px; height: 35px; object-fit: cover; border-radius: 4px;" />` : 'Sin foto'}
                   </td>
                   <td>
-                    <div style="display: flex; gap: 6px;">
-                      <button class="btn btn-outline" style="font-size: 0.8rem; padding: 4px 8px;" onclick="window.togglePopupActive('${p.id}')">
-                        ${p.activo ? 'Pausar' : 'Activar'}
-                      </button>
-                      <button class="btn btn-outline" style="font-size: 0.8rem; padding: 4px 8px;" onclick="window.openPopupFormModal('${p.id}')">
-                        ✏️ Editar
-                      </button>
-                      <button class="btn btn-outline" style="font-size: 0.8rem; padding: 4px 8px; color: red;" onclick="window.deletePopup('${p.id}')">
-                        🗑️ Borrar
-                      </button>
-                    </div>
+                    <button class="btn btn-outline" style="font-size: 0.8rem;" onclick="window.togglePopupActive('${p.id}')">
+                      ${p.activo ? 'Pausar' : 'Activar'}
+                    </button>
+                    <button class="btn btn-outline" style="font-size: 0.8rem;" onclick="window.openPopupFormModal('${p.id}')">
+                      ✏️ Editar
+                    </button>
+                    <button class="btn btn-outline" style="font-size: 0.8rem; color: red;" onclick="window.deletePopup('${p.id}')">
+                      🗑️ Borrar
+                    </button>
                   </td>
                 </tr>
               `;
@@ -1023,6 +960,8 @@ function renderRubroFormModal() {
 function renderPharmacyFormModal() {
   const f = state.editingItem || {};
   const isEdit = !!f.id;
+  const diasAsignados = f.diasTurno || [];
+  const fechasAsignadas = (f.fechasTurno || []).join(', ');
 
   return `
     <div class="modal-overlay">
@@ -1042,25 +981,31 @@ function renderPharmacyFormModal() {
           </div>
 
           <div class="form-group">
-            <label>Teléfono *</label>
-            <input type="tel" id="editPharmTelefono" value="${f.telefono || ''}" required placeholder="Ej: 2241-421111" />
+            <label>Teléfono de Contacto (Optativo)</label>
+            <input type="tel" id="editPharmTelefono" value="${f.telefono || ''}" placeholder="Ej: 2241-421111 (Opcional)" />
           </div>
 
           <div class="form-group">
-            <label>Horario de Atención</label>
-            <input type="text" id="editPharmHorario" value="${f.horario || 'Atención 24 hs'}" placeholder="Ej: De Turno (08:30 a 08:30 hs)" />
+            <label>Horario de Guardia</label>
+            <input type="text" id="editPharmHorario" value="${f.horario || 'Turno 24 hs (08:00 a 08:00 hs)'}" placeholder="Ej: Turno 24 hs (08:00 a 08:00 hs)" />
+          </div>
+
+          <div class="form-group" style="background: #fdf4ff; border: 1px solid #f5d0fe; padding: 14px; border-radius: var(--radius-md);">
+            <label style="font-weight: 700; color: #86198f;">📅 Fechas Específicas del Mes (Ej: 10/08, 17/08, 24/08, 31/08):</label>
+            <input type="text" id="editPharmFechas" value="${fechasAsignadas}" placeholder="Ej: 10/08, 17/08, 24/08, 31/08" style="margin-top: 6px;" />
+            <small style="color: #701a75; display: block; margin-top: 4px;">Ingresá 3, 4 o todas las fechas separadas por coma. El sistema las activará de 08:00 AM a 08:00 AM del día siguiente.</small>
           </div>
 
           <div class="form-group">
-            <label>Días de Turno Asignados (Separados por coma)</label>
-            <input type="text" id="editPharmDias" value="${(f.diasTurno || []).join(', ')}" placeholder="Ej: Lunes, Miércoles, Viernes" />
-          </div>
-
-          <div class="form-group">
-            <label>
-              <input type="checkbox" id="editPharmDeTurno" ${f.deTurno ? 'checked' : ''} />
-              <strong>¿Está de turno HOY?</strong>
-            </label>
+            <label style="font-weight: 700;">o Seleccioná Días de la Semana Fijos (Optativo):</label>
+            <div class="days-checkbox-grid">
+              ${['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo'].map(dia => `
+                <label class="day-checkbox-item">
+                  <input type="checkbox" name="pharmDaysCheck" value="${dia}" ${diasAsignados.includes(dia) ? 'checked' : ''} />
+                  <span>${dia}</span>
+                </label>
+              `).join('')}
+            </div>
           </div>
 
           <div style="display: flex; gap: 10px; margin-top: 20px;">
@@ -1081,21 +1026,13 @@ function renderPopupFormModal() {
     <div class="modal-overlay">
       <div class="form-modal-content">
         <button class="modal-close-btn" onclick="window.closePopupFormModal()">✕</button>
-        <h3>${isEdit ? 'Editar Anuncio Push App / Pop-up' : 'Crear Nuevo Anuncio Push App / Pop-up'}</h3>
+        <h3>${isEdit ? 'Editar Anuncio Pop-up' : 'Crear Nuevo Anuncio Pop-up'}</h3>
 
         <form onsubmit="window.savePopupForm(event)">
           <div class="form-group">
-            <label>Tipo de Formato del Anuncio *</label>
-            <select id="editPopTipo" required>
-              <option value="popup" ${p.tipo === 'popup' || !p.tipo ? 'selected' : ''}>📱 Pop-up Emergente (Ventana emergente al abrir)</option>
-              <option value="banner_top" ${p.tipo === 'banner_top' || p.tipo === 'push_app' ? 'selected' : ''}>📢 Push Banner Flotante (Notificación superior al inicio o sección)</option>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label>¿Dónde debe aparecer este Anuncio? (Ubicación Personalizada) *</label>
+            <label>¿Dónde debe aparecer este Pop-up publicitario? *</label>
             <select id="editPopUbicacion" required>
-              <option value="portada" ${p.ubicacion === 'portada' ? 'selected' : ''}>🏠 Portada Principal / Inicio</option>
+              <option value="portada" ${p.ubicacion === 'portada' ? 'selected' : ''}>🏠 Portada Principal (Al abrir la aplicación)</option>
               <optgroup label="📁 Al entrar a una Categoría o Rubro específico">
                 ${state.rubros.map(r => `<option value="${r.id}" ${p.ubicacion === r.id ? 'selected' : ''}>📁 Rubro: ${r.nombre}</option>`).join('')}
               </optgroup>
@@ -1111,7 +1048,7 @@ function renderPopupFormModal() {
           </div>
 
           <div class="form-group">
-            <label>Subtítulo / Nombre del Comercio</label>
+            <label>Subtítulo / Promo</label>
             <input type="text" id="editPopSubtitulo" value="${p.subtitulo || ''}" placeholder="Ej: Pizzería La Laguna" />
           </div>
 
@@ -1121,18 +1058,18 @@ function renderPopupFormModal() {
           </div>
 
           <div class="form-group" style="background: #f1f5f9; padding: 14px; border-radius: var(--radius-md);">
-            <label style="font-weight: 700;">📷 Imagen del Anuncio (Opcional, Subir desde la compu)</label>
+            <label style="font-weight: 700;">📷 Imagen del Pop-up (Subir desde la compu)</label>
             <input type="file" id="popFileInput" accept="image/*" onchange="window.handlePopupFileUpload(event)" style="margin-top: 6px; margin-bottom: 8px;" />
             <input type="text" id="editPopImagen" value="${p.imagen || ''}" placeholder="/uploads/mi_foto.jpg o URL" />
           </div>
 
           <div class="form-group">
-            <label>Texto del Botón de Acción</label>
-            <input type="text" id="editPopBotonTexto" value="${p.botonTexto || 'Ver Promoción'}" />
+            <label>Texto del Botón</label>
+            <input type="text" id="editPopBotonTexto" value="${p.botonTexto || 'Ver Promociones'}" />
           </div>
 
           <div class="form-group">
-            <label>Enlace del Botón (WhatsApp / Página Web)</label>
+            <label>Enlace del Botón (WhatsApp / Web)</label>
             <input type="text" id="editPopLink" value="${p.link || 'https://wa.me/5492241527357'}" />
           </div>
 
@@ -1145,7 +1082,7 @@ function renderPopupFormModal() {
 
           <div style="display: flex; gap: 10px; margin-top: 20px;">
             <button type="button" class="btn btn-outline" style="flex:1;" onclick="window.closePopupFormModal()">Cancelar</button>
-            <button type="submit" class="btn btn-primary" style="flex:1;">${isEdit ? 'Guardar Cambios' : 'Crear Anuncio'}</button>
+            <button type="submit" class="btn btn-primary" style="flex:1;">${isEdit ? 'Guardar Cambios' : 'Crear Pop-up'}</button>
           </div>
         </form>
       </div>
@@ -1492,16 +1429,18 @@ window.closePharmacyFormModal = function() {
 window.savePharmacyForm = async function(e) {
   e.preventDefault();
   const isEdit = state.editingItem && state.editingItem.id;
-  const diasStr = document.getElementById('editPharmDias').value;
-  const diasArr = diasStr ? diasStr.split(',').map(d => d.trim()).filter(Boolean) : [];
+  
+  const fechasStr = document.getElementById('editPharmFechas').value;
+  const fechasArr = fechasStr ? fechasStr.split(',').map(d => d.trim()).filter(Boolean) : [];
+  const selectedDays = Array.from(document.querySelectorAll('input[name="pharmDaysCheck"]:checked')).map(cb => cb.value);
 
   const body = {
     nombre: document.getElementById('editPharmNombre').value,
     direccion: document.getElementById('editPharmDireccion').value,
     telefono: document.getElementById('editPharmTelefono').value,
     horario: document.getElementById('editPharmHorario').value,
-    diasTurno: diasArr,
-    deTurno: document.getElementById('editPharmDeTurno').checked
+    fechasTurno: fechasArr,
+    diasTurno: selectedDays
   };
 
   const url = isEdit ? `/api/admin/pharmacies/${state.editingItem.id}` : '/api/admin/pharmacies';
@@ -1516,6 +1455,7 @@ window.savePharmacyForm = async function(e) {
     if (res.ok) {
       await loadAppData();
       window.closePharmacyFormModal();
+      alert('¡Farmacia guardada con éxito! El sistema activará el turno de 08:00 AM a 08:00 AM según las fechas o días asignados.');
     }
   } catch (err) {
     alert('Error al guardar farmacia');
@@ -1596,7 +1536,6 @@ window.savePopupForm = async function(e) {
   const isEdit = state.editingItem && state.editingItem.id;
 
   const body = {
-    tipo: document.getElementById('editPopTipo').value,
     ubicacion: document.getElementById('editPopUbicacion').value,
     titulo: document.getElementById('editPopTitulo').value,
     subtitulo: document.getElementById('editPopSubtitulo').value,
@@ -1621,55 +1560,7 @@ window.savePopupForm = async function(e) {
       window.closePopupFormModal();
     }
   } catch (err) {
-    alert('Error al guardar Anuncio');
-  }
-};
-
-window.toggleListingTop = async function(id) {
-  const listing = state.listings.find(l => l.id === id);
-  if (!listing) return;
-
-  try {
-    await fetch(`/api/admin/listings/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${state.adminToken}` },
-      body: JSON.stringify({ posicionTop: !listing.posicionTop })
-    });
-    await loadAppData();
-    renderApp();
-  } catch (err) {
-    alert('Error al cambiar posición de la publicación');
-  }
-};
-
-window.toggleListingResaltado = async function(id) {
-  const listing = state.listings.find(l => l.id === id);
-  if (!listing) return;
-
-  try {
-    await fetch(`/api/admin/listings/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${state.adminToken}` },
-      body: JSON.stringify({ resaltado: !listing.resaltado })
-    });
-    await loadAppData();
-    renderApp();
-  } catch (err) {
-    alert('Error al cambiar resplandor/resaltado');
-  }
-};
-
-window.changeListingPlan = async function(id, newPlan) {
-  try {
-    await fetch(`/api/admin/listings/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${state.adminToken}` },
-      body: JSON.stringify({ plan: newPlan })
-    });
-    await loadAppData();
-    renderApp();
-  } catch (err) {
-    alert('Error al actualizar plan de la publicación');
+    alert('Error al guardar Pop-up');
   }
 };
 
