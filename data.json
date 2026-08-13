@@ -49,119 +49,292 @@
       "color": "#7f8c8d"
     },
     {
+      "id": "remises",
+      "nombre": "Remises & Traslados",
+      "icono": "🚕",
+      "color": "#f39c12"
+    },
+    {
+      "id": "veterinarias",
+      "nombre": "Veterinarias & Mascotas",
+      "icono": "🐶",
+      "color": "#2ecc71"
+    },
+    {
+      "id": "inmobiliarias",
+      "nombre": "Inmobiliarias & Alquileres",
+      "icono": "🏠",
+      "color": "#34495e"
+    },
+    {
+      "id": "turismo",
+      "nombre": "Cabañas, Hoteles & Turismo",
+      "icono": "🏨",
+      "color": "#9b59b6"
+    },
+    {
       "id": "salud",
       "nombre": "Salud & Médicos",
       "icono": "🩺",
-      "color": "#2ecc71"
+      "color": "#1abc9c"
     },
     {
       "id": "servicios",
       "nombre": "Servicios para el Hogar",
-      "icono": "🏠",
+      "icono": "🛠️",
       "color": "#34495e"
     }
   ],
   "farmacias": [
     {
-      "id": "f1",
-      "nombre": "Farmacia Pasteur",
-      "direccion": "Av. Lastra 234, Chascomús",
-      "telefono": "2241-421111",
-      "horario": "De Turno (08:30 a 08:30 hs)",
-      "deTurno": true,
+      "id": "f_1786590706732",
+      "nombre": "Chascomus",
+      "direccion": "Av. Lastra 380",
+      "telefono": "00000000",
+      "horario": "Turno 24 hs (08:00 a 08:00 hs)",
+      "deTurno": false,
       "diasTurno": [
-        "Lunes",
-        "Miércoles",
-        "Viernes",
-        "Domingo"
+        "Lunes"
       ],
-      "mapsUrl": "https://maps.google.com/?q=Farmacia+Pasteur+Chascomus"
+      "mapsUrl": "https://maps.google.com/?q=Chascomus+Chascomus",
+      "fechasTurno": [
+        "10/08"
+      ]
     },
     {
-      "id": "f2",
-      "nombre": "Farmacia San Martín",
-      "direccion": "Calle Libres del Sur 145, Chascomús",
-      "telefono": "2241-432222",
-      "horario": "De Turno (08:30 a 08:30 hs)",
-      "deTurno": true,
-      "diasTurno": [
-        "Martes",
-        "Jueves",
-        "Sábado"
-      ],
-      "mapsUrl": "https://maps.google.com/?q=Farmacia+San+Martin+Chascomus"
-    },
-    {
-      "id": "f3",
-      "nombre": "Farmacia Central",
-      "direccion": "Av. Presidente Perón 89, Chascomús",
-      "telefono": "2241-425555",
-      "horario": "Atención Regular (08:00 a 20:00 hs)",
+      "id": "f_1786591047855",
+      "nombre": "ORIA ",
+      "direccion": "LIBRES DEL SUR  Y MAIPU",
+      "telefono": "",
+      "horario": "Turno 24 hs (08:00 a 08:00 hs)",
       "deTurno": false,
       "diasTurno": [],
-      "mapsUrl": "https://maps.google.com/?q=Farmacia+Central+Chascomus"
+      "mapsUrl": "https://maps.google.com/?q=ORIA%20+Chascomus",
+      "fechasTurno": [
+        "10/08"
+      ]
+    },
+    {
+      "id": "f_1786591094788",
+      "nombre": "MORISET",
+      "direccion": "Av. Lastra 591",
+      "telefono": "",
+      "horario": "Turno 24 hs (08:00 a 08:00 hs)",
+      "deTurno": false,
+      "diasTurno": [],
+      "mapsUrl": "https://maps.google.com/?q=MORISET+Chascomus",
+      "fechasTurno": [
+        "10/08"
+      ]
+    },
+    {
+      "id": "f_1786591276193",
+      "nombre": "DEL NORTE",
+      "direccion": "OMBU 102",
+      "telefono": "",
+      "horario": "Turno 24 hs (08:00 a 08:00 hs)",
+      "deTurno": false,
+      "diasTurno": [],
+      "mapsUrl": "https://maps.google.com/?q=DEL%20NORTE+Chascomus",
+      "fechasTurno": [
+        "11/08"
+      ]
+    },
+    {
+      "id": "f_1786591319908",
+      "nombre": "APRILE",
+      "direccion": "Av. Lastra 115",
+      "telefono": "",
+      "horario": "Turno 24 hs (08:00 a 08:00 hs)",
+      "deTurno": false,
+      "diasTurno": [],
+      "mapsUrl": "https://maps.google.com/?q=APRILE+Chascomus",
+      "fechasTurno": [
+        "12/08"
+      ]
+    },
+    {
+      "id": "f_1786591536447",
+      "nombre": "PUYSEGUR",
+      "direccion": "LIBRES DEL SUR  946",
+      "telefono": "",
+      "horario": "Turno 24 hs (08:00 a 08:00 hs)",
+      "deTurno": false,
+      "diasTurno": [],
+      "mapsUrl": "https://maps.google.com/?q=PUYSEGUR+Chascomus",
+      "fechasTurno": [
+        "12/08"
+      ]
+    },
+    {
+      "id": "f_1786591620552",
+      "nombre": "PASTEUR",
+      "direccion": "LIBRES DEL SUR 302",
+      "telefono": "",
+      "horario": "Turno 24 hs (08:00 a 08:00 hs)",
+      "deTurno": false,
+      "diasTurno": [],
+      "mapsUrl": "https://maps.google.com/?q=PASTEUR+Chascomus",
+      "fechasTurno": [
+        "13/08"
+      ]
+    },
+    {
+      "id": "f_1786592259853",
+      "nombre": "MALENA",
+      "direccion": "ESCRIBANO 2",
+      "telefono": "",
+      "horario": "Turno 24 hs (08:00 a 08:00 hs)",
+      "deTurno": false,
+      "diasTurno": [],
+      "mapsUrl": "https://maps.google.com/?q=MALENA+Chascomus",
+      "fechasTurno": [
+        "13/08"
+      ]
+    },
+    {
+      "id": "f_1786592286438",
+      "nombre": "POZZI",
+      "direccion": "RIOJA 28",
+      "telefono": "",
+      "horario": "Turno 24 hs (08:00 a 08:00 hs)",
+      "deTurno": false,
+      "diasTurno": [],
+      "mapsUrl": "https://maps.google.com/?q=POZZI+Chascomus",
+      "fechasTurno": [
+        "14/08 15/08"
+      ]
+    },
+    {
+      "id": "f_1786592428470",
+      "nombre": "FARMASUR",
+      "direccion": "PTE. ALFONSIN Y B.B",
+      "telefono": "",
+      "horario": "Turno 24 hs (08:00 a 08:00 hs)",
+      "deTurno": false,
+      "diasTurno": [],
+      "mapsUrl": "https://maps.google.com/?q=FARMASUR+Chascomus",
+      "fechasTurno": [
+        "14/08"
+      ]
+    },
+    {
+      "id": "f_1786592466369",
+      "nombre": "BELLINGERI",
+      "direccion": "H. IRIGOYEN 78",
+      "telefono": "",
+      "horario": "Turno 24 hs (08:00 a 08:00 hs)",
+      "deTurno": false,
+      "diasTurno": [],
+      "mapsUrl": "https://maps.google.com/?q=BELLINGERI+Chascomus",
+      "fechasTurno": [
+        "15/08"
+      ]
+    },
+    {
+      "id": "f_1786592621875",
+      "nombre": "ALFONSIN",
+      "direccion": "LIBRES DEL SUR  133",
+      "telefono": "",
+      "horario": "Turno 24 hs (08:00 a 08:00 hs)",
+      "deTurno": false,
+      "diasTurno": [],
+      "mapsUrl": "https://maps.google.com/?q=ALFONSIN+Chascomus",
+      "fechasTurno": [
+        "16/08"
+      ]
+    },
+    {
+      "id": "f_1786592668660",
+      "nombre": "KUBE",
+      "direccion": "J.M. DE ROSAS 2494",
+      "telefono": "",
+      "horario": "Turno 24 hs (08:00 a 08:00 hs)",
+      "deTurno": false,
+      "diasTurno": [],
+      "mapsUrl": "https://maps.google.com/?q=KUBE+Chascomus",
+      "fechasTurno": [
+        "16/08"
+      ]
+    },
+    {
+      "id": "f_1786592778233",
+      "nombre": "CANGIALOSI",
+      "direccion": "GARAY 56",
+      "telefono": "",
+      "horario": "Turno 24 hs (08:00 a 08:00 hs)",
+      "deTurno": false,
+      "diasTurno": [],
+      "mapsUrl": "https://maps.google.com/?q=CANGIALOSI+Chascomus",
+      "fechasTurno": [
+        "17/08"
+      ]
+    },
+    {
+      "id": "f_1786592797705",
+      "nombre": "PENSA",
+      "direccion": "H. IRIGOYEN 710",
+      "telefono": "",
+      "horario": "Turno 24 hs (08:00 a 08:00 hs)",
+      "deTurno": false,
+      "diasTurno": [],
+      "mapsUrl": "https://maps.google.com/?q=PENSA+Chascomus",
+      "fechasTurno": [
+        "17/"
+      ]
     }
   ],
-  "anuncios": {
-    "popup": {
+  "popups": [
+    {
+      "id": "pop_main",
+      "ubicacion": "portada",
+      "tipo": "popup",
       "activo": true,
       "titulo": "¡SÚPER PROMO FIN DE SEMANA EN LAGUNA!",
       "subtitulo": "Heladería El Faro - 2x1 en Kilo de Helado",
       "descripcion": "Vení a disfrutar de la mejor vista a la laguna con nuestros helados artesanales. Presentá este anuncio y llevate 2x1 este sábado y domingo.",
       "imagen": "https://images.unsplash.com/photo-1570197788417-0e82375c9371?w=800&auto=format&fit=crop&q=80",
-      "botonTexto": "Ver Ubicación & Promociones",
+      "botonTexto": "Ver Promociones",
       "link": "https://wa.me/5492241527357?text=Hola,%20vi%20la%20promo%20en%20la%20Guia%20Chascomus"
     },
-    "bannerRubro": {
+    {
+      "id": "pop_banner_home",
+      "ubicacion": "portada",
+      "tipo": "banner_top",
       "activo": true,
-      "rubroId": "gastronomia",
-      "titulo": "Pizzería & Chopería La Laguna",
-      "texto": "Delivery sin cargo en todo Chascomús. ¡Pedí por WhatsApp!",
-      "telefono": "2241-554433"
+      "titulo": "📢 ¡PROMOS DESTACADAS DE HOY!",
+      "subtitulo": "Aprovechá los mejores descuentos en los comercios de Chascomús.",
+      "descripcion": "Hacé clic para chatear directamente por WhatsApp.",
+      "imagen": "",
+      "botonTexto": "Ver Ofertas",
+      "link": "https://wa.me/5492241527357?text=Hola,%20busco%20promociones%20en%20Chascomus"
+    },
+    {
+      "id": "pop_gastro",
+      "ubicacion": "gastronomia",
+      "tipo": "popup",
+      "activo": true,
+      "titulo": "🍕 NOCHE DE PIZZAS EN LA LAGUNA",
+      "subtitulo": "10% OFF en Delivery de Pizzas a la Piedra",
+      "descripcion": "Pizzas caseras horneadas al momento. Pedí por WhatsApp ingresando tu dirección en Chascomús.",
+      "imagen": "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=800&auto=format&fit=crop&q=80",
+      "botonTexto": "Pedir por WhatsApp",
+      "link": "https://wa.me/5492241527357?text=Hola,%20quiero%20pedir%20pizza"
     }
-  },
+  ],
   "listings": [
-    {
-      "id": "l_1786427261099",
-      "nombre": "Buenos Aires",
-      "rubroId": "carpinteria",
-      "rubroNombre": "Carpintería & Muebles",
-      "plan": "gratuito",
-      "direccion": "Democracia 72",
-      "telefono": "02241527357",
-      "whatsapp": "5492241527357",
-      "descripcion": " bn",
-      "horarios": "Consultar por teléfono",
-      "redes": "",
-      "fotos": [],
-      "verificado": true,
-      "fechaAlta": "2026-08-11"
-    },
-    {
-      "id": "l_1786427255707",
-      "nombre": "Taller Mecánico El Gaucho",
-      "rubroId": "mecanica",
-      "rubroNombre": "Mecánica & Repuestos",
-      "plan": "gratuito",
-      "direccion": "Av. Juan Manuel de Rosas 890, Chascomús",
-      "telefono": "2241-511223",
-      "whatsapp": "5492241511223",
-      "descripcion": "Inyección electrónica, frenos, tren delantero y cambio de aceite. Diagnóstico computarizado.",
-      "horarios": "Consultar por teléfono",
-      "redes": "",
-      "fotos": [],
-      "verificado": true,
-      "fechaAlta": "2026-08-11"
-    },
     {
       "id": "l1",
       "nombre": "Pizzería & Restaurante La Laguna",
       "rubroId": "gastronomia",
       "rubroNombre": "Gastronomía & Comidas",
-      "plan": "destacado",
+      "plan": "oro",
+      "posicionTop": true,
+      "resaltado": true,
+      "colorPersonalizado": "#f59e0b",
       "direccion": "Av. Costanera España 450, Chascomús",
       "telefono": "2241-554433",
-      "whatsapp": "5492241554433",
+      "whatsapp": "5492241527357",
       "descripcion": "Especialidad en pizzas a la piedra, empanadas caseras, minutas y la mejor vista a la laguna de Chascomús. Envíos a domicilio sin cargo.",
       "horarios": "Lunes a Domingo de 19:30 a 01:00 hs",
       "redes": "Instagram: @lalaguna.chascomus",
@@ -177,10 +350,12 @@
       "nombre": "Carpintería El Roble - Muebles a Medida",
       "rubroId": "carpinteria",
       "rubroNombre": "Carpintería & Muebles",
-      "plan": "destacado",
+      "plan": "plata",
+      "posicionTop": false,
+      "colorPersonalizado": "#0284c7",
       "direccion": "Calle Lincoln 320, Chascomús",
       "telefono": "2241-667788",
-      "whatsapp": "5492241667788",
+      "whatsapp": "5492241527357",
       "descripcion": "Diseño y fabricación de placares, muebles de cocina, aberturas y restauración de muebles antiguos. Presupuestos sin cargo en Chascomús.",
       "horarios": "Lunes a Viernes de 08:00 a 17:00 hs",
       "redes": "Facebook: Carpinteria El Roble Chascomus",
@@ -196,6 +371,8 @@
       "rubroId": "ferreteria",
       "rubroNombre": "Ferreterías & Materiales",
       "plan": "gratuito",
+      "posicionTop": false,
+      "colorPersonalizado": "",
       "direccion": "Calle Italia 120, Chascomús",
       "telefono": "2241-423344",
       "whatsapp": "5492241423344",
@@ -205,84 +382,9 @@
       "fotos": [],
       "verificado": true,
       "fechaAlta": "2026-08-03"
-    },
-    {
-      "id": "l4",
-      "nombre": "Juan Pérez - Plomero y Gasista Matriculado",
-      "rubroId": "plomeria",
-      "rubroNombre": "Plomería & Gas Matriculado",
-      "plan": "gratuito",
-      "direccion": "Chascomús y zonas rurales",
-      "telefono": "2241-612345",
-      "whatsapp": "5492241612345",
-      "descripcion": "Urgencias 24 hs. Instalaciones de agua, cloacas, colocación de sanitarios, termotanques y reparaciones de gas.",
-      "horarios": "Urgencias 24 Horas",
-      "redes": "",
-      "fotos": [],
-      "verificado": true,
-      "fechaAlta": "2026-08-04"
-    },
-    {
-      "id": "l5",
-      "nombre": "Albañilería y Construcción Olmos",
-      "rubroId": "albanileria",
-      "rubroNombre": "Albañilería & Reformas",
-      "plan": "gratuito",
-      "direccion": "Chascomús",
-      "telefono": "2241-698765",
-      "whatsapp": "5492241698765",
-      "descripcion": "Obras de cero, refacciones, colocación de cerámicos, revoques, losas y pintura en general. Trabajos garantizados.",
-      "horarios": "Lunes a Sábado de 07:30 a 18:00 hs",
-      "redes": "",
-      "fotos": [],
-      "verificado": true,
-      "fechaAlta": "2026-08-05"
     }
   ],
-  "submissions": [
-    {
-      "id": "sub_1786427572702",
-      "nombre": "Buenos Aires",
-      "rubroId": "gastronomia",
-      "rubroNombre": "Gastronomía & Comidas",
-      "direccion": "Democracia 72",
-      "telefono": "02241527357",
-      "whatsapp": "5492241527357",
-      "contactoNombre": "Buenos Aires",
-      "descripcion": " vbvbv",
-      "planDeseado": "gratuito",
-      "estado": "rechazado",
-      "fecha": "2026-08-11 05:52"
-    },
-    {
-      "id": "sub_1786427222633",
-      "nombre": "Buenos Aires",
-      "rubroId": "carpinteria",
-      "rubroNombre": "Carpintería & Muebles",
-      "direccion": "Democracia 72",
-      "telefono": "02241527357",
-      "whatsapp": "5492241527357",
-      "contactoNombre": "Buenos Aires",
-      "descripcion": " bn",
-      "planDeseado": "gratuito",
-      "estado": "aprobado",
-      "fecha": "2026-08-11 05:47"
-    },
-    {
-      "id": "sub_101",
-      "nombre": "Taller Mecánico El Gaucho",
-      "rubroId": "mecanica",
-      "rubroNombre": "Mecánica & Repuestos",
-      "direccion": "Av. Juan Manuel de Rosas 890, Chascomús",
-      "telefono": "2241-511223",
-      "whatsapp": "5492241511223",
-      "contactoNombre": "Carlos Gómez",
-      "descripcion": "Inyección electrónica, frenos, tren delantero y cambio de aceite. Diagnóstico computarizado.",
-      "planDeseado": "gratuito",
-      "estado": "aprobado",
-      "fecha": "2026-08-10 18:30"
-    }
-  ],
-  "adminPassword": "Chiacchio@1938",
+  "submissions": [],
+  "adminPassword": "admin123",
   "whatsappAdmin": "5492241527357"
 }
