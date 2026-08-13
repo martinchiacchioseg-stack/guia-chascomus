@@ -1,5 +1,5 @@
 // ==========================================================================
-// GUÍA CHASCOMÚS - CLIENT APPLICATION LOGIC (v13.0 - WHATSAPP CHANNEL IMPORTER)
+// GUÍA CHASCOMÚS - CLIENT APPLICATION LOGIC (v14.0 - DUTY PHARMACIES & ROLFI FIXES)
 // Branding: Desarrollado por rolϕ
 // WhatsApp: 5492241527357
 // ==========================================================================
@@ -21,6 +21,8 @@ const state = {
   showPopupFormModal: false,
   showRubroFormModal: false,
   showEventFormModal: false,
+  showEventDetailModal: false,
+  activeEvent: null,
   editingItem: null,
   isAdmin: false,
   adminToken: null,
@@ -245,6 +247,7 @@ function renderApp() {
     ${state.showPopupFormModal ? renderPopupFormModal() : ''}
     ${state.showRubroFormModal ? renderRubroFormModal() : ''}
     ${state.showEventFormModal ? renderEventFormModal() : ''}
+    ${state.showEventDetailModal ? renderEventDetailModal() : ''}
   `;
 }
 
@@ -307,14 +310,10 @@ function renderPharmCard(f, isDeTurno) {
   const mapLink = f.mapsUrl || `https://maps.google.com/?q=${encodeURIComponent(f.nombre)}+Chascomus`;
 
   return `
-    <div class="pharmacy-card" onclick="window.checkPharmacyPopup('${f.id}')" style="cursor: pointer; ${isDeTurno ? 'border-color: #10b981; background: linear-gradient(180deg, #f0fdf4 0%, #ffffff 100%);' : 'border-color: var(--border);'}">
+    <div class="pharmacy-card" onclick="window.checkPharmacyPopup('${f.id}')" style="cursor: pointer; border-color: #10b981; background: linear-gradient(180deg, #f0fdf4 0%, #ffffff 100%);">
       <div>
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-          ${isDeTurno ? `
-            <div class="pharmacy-badge-guardia">❇️ DE GUARDIA</div>
-          ` : `
-            <div class="pharmacy-badge-regular">⚪ REGULAR</div>
-          `}
+          <div class="pharmacy-badge-guardia">❇️ DE GUARDIA</div>
           ${hasAd ? '<span style="font-size: 0.7rem; background: var(--accent-gold); color: white; padding: 2px 6px; border-radius: 99px; font-weight: 700;">📢 PROMO</span>' : ''}
         </div>
         
@@ -337,85 +336,126 @@ function renderPharmCard(f, isDeTurno) {
       
       <div class="pharmacy-actions">
         ${f.telefono ? `<a href="tel:${f.telefono}" class="btn btn-outline" style="flex:1;" onclick="event.stopPropagation(); window.checkPharmacyPopup('${f.id}');">📞 Llamar</a>` : ''}
-        <a href="${mapLink}" target="_blank" class="btn btn-primary" style="${isDeTurno ? 'background: linear-gradient(135deg, #10b981, #059669);' : ''} flex:1;" onclick="event.stopPropagation(); window.checkPharmacyPopup('${f.id}');">📍 Mapa</a>
+        <a href="${mapLink}" target="_blank" class="btn btn-primary" style="background: linear-gradient(135deg, #10b981, #059669); flex:1;" onclick="event.stopPropagation(); window.checkPharmacyPopup('${f.id}');">📍 Mapa</a>
       </div>
     </div>
   `;
 }
 
+// SOLO SE MUESTRAN LAS FARMACIAS QUE ESTÁN DE TURNO
 function renderFarmaciasSection() {
-  if (!state.farmacias || state.farmacias.length === 0) {
+  if (!state.farmacias || state.farmacias.length === 0) return '';
+
+  const dutyInfo = getPharmDutyDateInfo();
+  const deTurno = state.farmacias.filter(f => isPharmDeTurnoToday(f));
+
+  if (deTurno.length === 0) {
     return `
-      <section style="margin-bottom: 28px;">
+      <section style="margin-bottom: 24px;">
         <div class="section-title">
-          <h3>❇️ Farmacias de Guardia en Chascomús</h3>
+          <h3>❇️ Farmacias de Guardia hoy en Chascomús</h3>
+          <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 500;">Hoy ${dutyInfo.dayName} ${dutyInfo.shortDate} — Guardia 08:00 a 08:00 hs</span>
         </div>
-        <div style="background: white; padding: 18px; border-radius: var(--radius-md); border: 1px solid var(--border); text-align: center;">
-          <p style="color: var(--text-muted); font-size: 0.9rem;">No hay farmacias cargadas en el sistema. Podés agregarlas desde el Panel de Administración.</p>
+        <div style="background: white; padding: 14px 18px; border-radius: var(--radius-md); border: 1px solid var(--border); font-size: 0.9rem; color: var(--text-muted); text-align: center;">
+          No hay farmacias de guardia configuradas para la fecha de hoy. Podés asignarlas desde el Panel de Administración.
         </div>
       </section>
     `;
   }
 
-  const dutyInfo = getPharmDutyDateInfo();
-  const deTurno = state.farmacias.filter(f => isPharmDeTurnoToday(f));
-  const regulares = state.farmacias.filter(f => !isPharmDeTurnoToday(f));
-
   return `
     <section style="margin-bottom: 28px;">
       <div class="section-title">
-        <h3>❇️ Farmacias de Guardia & Atención en Chascomús</h3>
+        <h3>❇️ Farmacia de Guardia activa hoy en Chascomús</h3>
         <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 500;">Hoy ${dutyInfo.dayName} ${dutyInfo.shortDate} — Guardia 08:00 a 08:00 hs</span>
       </div>
       
       <div class="pharmacy-card-grid">
         ${deTurno.map(f => renderPharmCard(f, true)).join('')}
-        ${regulares.map(f => renderPharmCard(f, false)).join('')}
       </div>
     </section>
   `;
 }
 
 function renderMunicipalEventsSection() {
+  if (!state.eventosMunicipales || state.eventosMunicipales.length === 0) return '';
+
   return `
-    <section style="margin-bottom: 36px; background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); padding: 22px; border-radius: var(--radius-lg); border: 1px solid #bae6fd;">
-      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
+    <section style="margin-bottom: 30px; background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); padding: 18px 20px; border-radius: var(--radius-lg); border: 1px solid #bae6fd;">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 12px;">
         <div>
-          <h3 style="font-size: 1.3rem; color: #0369a1; font-weight: 800; display: flex; align-items: center; gap: 8px;">
-            🏛️ Novedades & Eventos Municipales de Chascomús
+          <h3 style="font-size: 1.15rem; color: #0369a1; font-weight: 800; display: flex; align-items: center; gap: 8px;">
+            🏛️ Novedades & Eventos Municipales
           </h3>
-          <p style="font-size: 0.88rem; color: #0284c7; margin-top: 2px;">
-            Agenda cultural, actividades comunitarias e informes oficiales del municipio directo en la pantalla.
+          <p style="font-size: 0.82rem; color: #0284c7;">
+            Hacé clic en cualquier tarjeta para leer la información completa.
           </p>
         </div>
 
-        <button onclick="window.toggleAdmin()" class="btn btn-primary" style="font-size: 0.8rem; background: #0284c7;">
-          ⚡ Importar Publicaciones de WhatsApp
+        <button onclick="window.toggleAdmin()" class="btn btn-primary" style="font-size: 0.78rem; padding: 6px 12px; background: #0284c7;">
+          ⚡ Cargar / Importar
         </button>
       </div>
 
-      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px;">
         ${state.eventosMunicipales.map(evt => `
-          <div style="background: white; border-radius: var(--radius-md); border: 1px solid #e0f2fe; overflow: hidden; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; justify-content: space-between;">
-            ${evt.imagen ? `<img src="${evt.imagen}" style="width: 100%; height: 140px; object-fit: cover;" />` : ''}
-            <div style="padding: 14px; flex: 1;">
-              <span style="background: #e0f2fe; color: #0369a1; font-size: 0.72rem; font-weight: 700; padding: 3px 8px; border-radius: 99px; text-transform: uppercase;">
+          <div 
+            onclick="window.openEventDetailModal('${evt.id}')"
+            style="background: white; border-radius: var(--radius-md); border: 1px solid #bae6fd; overflow: hidden; box-shadow: var(--shadow-sm); cursor: pointer; transition: transform 0.15s ease;"
+            onmouseover="this.style.transform='translateY(-2px)'"
+            onmouseout="this.style.transform='none'"
+          >
+            ${evt.imagen ? `<img src="${evt.imagen}" style="width: 100%; height: 100px; object-fit: cover;" />` : ''}
+            <div style="padding: 10px 12px;">
+              <span style="background: #e0f2fe; color: #0369a1; font-size: 0.68rem; font-weight: 700; padding: 2px 6px; border-radius: 99px; text-transform: uppercase;">
                 ${evt.categoria || 'Municipal'}
               </span>
-              <h4 style="font-size: 1.05rem; font-weight: 700; margin: 8px 0 4px; color: var(--text-main); line-height: 1.25;">
+              <h4 style="font-size: 0.95rem; font-weight: 700; margin: 6px 0 2px; color: var(--text-main); line-height: 1.25;">
                 ${evt.titulo}
               </h4>
-              <div style="font-size: 0.8rem; color: #0284c7; font-weight: 600; margin-bottom: 6px;">
-                📅 ${evt.fecha} — 📍 ${evt.lugar}
+              <div style="font-size: 0.78rem; color: #0284c7; font-weight: 600; margin-bottom: 4px;">
+                📅 ${evt.fecha}
               </div>
-              <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.35; white-space: pre-line;">
+              <p style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
                 ${evt.descripcion}
               </p>
+              <span style="display: inline-block; margin-top: 6px; font-size: 0.75rem; color: var(--primary); font-weight: 700;">
+                📖 Leer más...
+              </span>
             </div>
           </div>
         `).join('')}
       </div>
     </section>
+  `;
+}
+
+function renderEventDetailModal() {
+  const evt = state.activeEvent;
+  if (!evt) return '';
+
+  return `
+    <div class="modal-overlay">
+      <div class="form-modal-content" style="max-width: 550px;">
+        <button class="modal-close-btn" onclick="window.closeEventDetailModal()">✕</button>
+        ${evt.imagen ? `<img src="${evt.imagen}" style="width:100%; max-height:220px; object-fit:cover; border-radius:var(--radius-md); margin-bottom:14px;" />` : ''}
+        <span style="background: #e0f2fe; color: #0369a1; font-size: 0.75rem; font-weight: 700; padding: 4px 10px; border-radius: 99px; text-transform: uppercase;">
+          ${evt.categoria || 'Municipal'}
+        </span>
+        <h3 style="font-size: 1.25rem; margin: 10px 0 6px; color: var(--text-main);">${evt.titulo}</h3>
+        <div style="font-size: 0.85rem; color: #0284c7; font-weight: 600; margin-bottom: 12px;">
+          📅 ${evt.fecha} — 📍 ${evt.lugar}
+        </div>
+        <div style="font-size: 0.92rem; color: var(--text-main); line-height: 1.5; white-space: pre-line; margin-bottom: 20px;">
+          ${evt.descripcion}
+        </div>
+        ${evt.oficialLink ? `
+          <a href="${evt.oficialLink}" target="_blank" class="btn btn-primary" style="width:100%;">
+            🔗 Ver en Sitio Oficial
+          </a>
+        ` : ''}
+      </div>
+    </div>
   `;
 }
 
@@ -452,6 +492,37 @@ function renderRubrosSection() {
 function renderListingsSection() {
   let filtered = performSmartSearch(state.searchQuery);
   let rubroObj = state.rubros.find(r => r.id === state.selectedRubro);
+
+  if (state.selectedRubro === 'farmacias') {
+    // Si eligieron el rubro farmacias, mostrar todas las farmacias registradas
+    return `
+      <section id="listings-section" style="scroll-margin-top: 80px;">
+        <div class="section-title" style="display: flex; justify-content: space-between; align-items: center;">
+          <h3>💊 Todas las Farmacias en Chascomús (${state.farmacias.length})</h3>
+          <button class="btn btn-outline" style="font-size: 0.82rem; padding: 6px 14px;" onclick="window.resetFilters()">
+            ✕ Ver Todos los Rubros
+          </button>
+        </div>
+
+        <div class="listings-grid">
+          ${state.farmacias.map(f => {
+            const deTurno = isPharmDeTurnoToday(f);
+            return `
+              <div class="card-free" style="${deTurno ? 'border-color: #10b981; background: #f0fdf4;' : ''}">
+                <span class="card-category">${deTurno ? '❇️ DE GUARDIA HOY' : 'ATENCIÓN REGULAR'}</span>
+                <h4>${f.nombre}</h4>
+                <p class="card-description">📍 ${f.direccion}<br>${f.horario || ''}</p>
+                <div class="card-actions">
+                  ${f.telefono ? `<a href="tel:${f.telefono}" class="btn btn-outline">📞 Llamar</a>` : ''}
+                  <a href="${f.mapsUrl || `https://maps.google.com/?q=${encodeURIComponent(f.nombre)}+Chascomus`}" target="_blank" class="btn btn-primary">📍 Mapa</a>
+                </div>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </section>
+    `;
+  }
 
   if (state.selectedRubro !== 'todos') {
     filtered = filtered.filter(l => l.rubroId === state.selectedRubro);
@@ -605,7 +676,8 @@ function renderAiAssistantWidget() {
 
 window.handleHeroAiSubmit = function(e) {
   e.preventDefault();
-  const inputVal = document.getElementById('heroAiInput').value;
+  const inputEl = document.getElementById('heroAiInput');
+  const inputVal = inputEl ? inputEl.value : '';
   if (!inputVal.trim()) return;
 
   state.aiInputText = inputVal;
@@ -620,6 +692,8 @@ window.toggleAiChat = function() {
     setTimeout(() => {
       const scroll = document.getElementById('aiChatScroll');
       if (scroll) scroll.scrollTop = scroll.scrollHeight;
+      const inputEl = document.getElementById('aiInput');
+      if (inputEl) inputEl.focus();
     }, 50);
   }
 };
@@ -631,11 +705,26 @@ window.askAiPrompt = function(promptText) {
 
 window.handleAiMessageSubmit = function(e) {
   if (e) e.preventDefault();
-  const text = state.aiInputText.trim();
+
+  const aiInput = document.getElementById('aiInput');
+  const heroInput = document.getElementById('heroAiInput');
+
+  let text = '';
+  if (aiInput && aiInput.value.trim()) {
+    text = aiInput.value.trim();
+  } else if (heroInput && heroInput.value.trim()) {
+    text = heroInput.value.trim();
+  } else if (state.aiInputText && state.aiInputText.trim()) {
+    text = state.aiInputText.trim();
+  }
+
   if (!text) return;
 
   state.aiMessages.push({ sender: 'user', text });
   state.aiInputText = '';
+
+  if (aiInput) aiInput.value = '';
+  if (heroInput) heroInput.value = '';
 
   const textLower = text.toLowerCase();
   let botReply = '';
@@ -643,17 +732,17 @@ window.handleAiMessageSubmit = function(e) {
   if (textLower.includes('evento') || textLower.includes('municip') || textLower.includes('cultura') || textLower.includes('teatro') || textLower.includes('maraton')) {
     if (state.eventosMunicipales.length > 0) {
       const topEvt = state.eventosMunicipales[0];
-      botReply = `🏛️ ¡Sí! En la sección de Novedades Municipales tenés los últimos eventos. El destacado es: **${topEvt.titulo}** (${topEvt.fecha} en ${topEvt.lugar}).`;
+      botReply = `🏛️ ¡Sí! En Novedades Municipales tenés los últimos eventos. El destacado es: **${topEvt.titulo}** (${topEvt.fecha} en ${topEvt.lugar}). Podés hacer clic en la tarjeta para leer más.`;
     } else {
-      botReply = `🏛️ Podés ver todos los eventos e informes del municipio en el bloque oficial arriba de las categorías.`;
+      botReply = `🏛️ Podés consultar todos los informes e iniciativas del municipio en el bloque de Novedades Municipales.`;
     }
   } else if (textLower.includes('farmacia') || textLower.includes('guardia') || textLower.includes('remedio') || textLower.includes('medicamento')) {
     const dutyInfo = getPharmDutyDateInfo();
     const deTurno = state.farmacias.filter(f => isPharmDeTurnoToday(f));
     if (deTurno.length > 0) {
-      botReply = `❇️ ¡Hola! Hoy ${dutyInfo.dayName} ${dutyInfo.shortDate} la farmacia de guardia activa es **${deTurno[0].nombre}** en ${deTurno[0].direccion}. Podés ver su mapa de llegada arriba de todo.`;
+      botReply = `❇️ ¡Hola! Hoy ${dutyInfo.dayName} ${dutyInfo.shortDate} la farmacia de guardia activa es **${deTurno[0].nombre}** en ${deTurno[0].direccion}. Está destacada arriba de todo con la cruz verde.`;
     } else {
-      botReply = `💊 Podés consultar el listado completo de farmacias en Chascomús arriba de todo en la pantalla principal.`;
+      botReply = `💊 Podés ver las farmacias de guardia arriba de todo o consultar el listado en la categoría Farmacias.`;
     }
     state.searchQuery = 'farmacia';
   } else if (textLower.includes('plomero') || textLower.includes('agua') || textLower.includes('canilla') || textLower.includes('caño') || textLower.includes('gas')) {
@@ -690,6 +779,18 @@ window.handleAiMessageSubmit = function(e) {
       listingsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   }, 100);
+};
+
+window.openEventDetailModal = function(id) {
+  state.activeEvent = state.eventosMunicipales.find(e => e.id === id);
+  state.showEventDetailModal = true;
+  renderApp();
+};
+
+window.closeEventDetailModal = function() {
+  state.showEventDetailModal = false;
+  state.activeEvent = null;
+  renderApp();
 };
 
 function renderAdModal() {
