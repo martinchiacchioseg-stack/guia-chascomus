@@ -123,9 +123,16 @@ async function requestHandler(req, res) {
       listings = listings.filter(l => l.plan === plan);
     }
 
+    // Ordenar: Posición Top arriba -> Oro VIP -> Plata -> Gratuito
     listings.sort((a, b) => {
-      if (a.plan === 'destacado' && b.plan !== 'destacado') return -1;
-      if (a.plan !== 'destacado' && b.plan === 'destacado') return 1;
+      if (a.posicionTop && !b.posicionTop) return -1;
+      if (!a.posicionTop && b.posicionTop) return 1;
+
+      const score = (p) => (p === 'oro' || p === 'destacado' ? 3 : p === 'plata' ? 2 : 1);
+      const scoreA = score(a.plan);
+      const scoreB = score(b.plan);
+
+      if (scoreA !== scoreB) return scoreB - scoreA;
       return (b.id || '').localeCompare(a.id || '');
     });
 
@@ -153,7 +160,7 @@ async function requestHandler(req, res) {
       whatsapp: whatsapp || ('549' + telefono.replace(/\D/g, '')),
       contactoNombre: contactoNombre || nombre,
       descripcion: descripcion || '',
-      planDeseado: 'gratuito',
+      planDeseado: body.planDeseado || 'gratuito',
       estado: 'pendiente',
       fecha: new Date().toISOString().replace('T', ' ').substring(0, 16)
     };
@@ -181,6 +188,44 @@ async function requestHandler(req, res) {
   if (pathname.startsWith('/api/admin/')) {
     if (!isAdminAuthorized) {
       return sendJson(res, { error: 'No autorizado' }, 403);
+    }
+
+    // CRUD RUBROS (Categorías)
+    if (pathname === '/api/admin/rubros' && method === 'POST') {
+      const body = await getRequestBody(req);
+      const db = getDb();
+      const idClean = (body.nombre || 'rubro').toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Date.now();
+      const newRubro = {
+        id: body.id || idClean,
+        nombre: body.nombre || 'Nueva Categoría',
+        icono: body.icono || '📁',
+        color: body.color || '#0284c7'
+      };
+      if (!db.rubros) db.rubros = [];
+      db.rubros.push(newRubro);
+      saveDb(db);
+      return sendJson(res, { success: true, rubro: newRubro });
+    }
+
+    if (pathname.startsWith('/api/admin/rubros/') && method === 'PUT') {
+      const id = pathname.split('/')[4];
+      const body = await getRequestBody(req);
+      const db = getDb();
+      const idx = db.rubros.findIndex(r => r.id === id);
+      if (idx !== -1) {
+        db.rubros[idx] = { ...db.rubros[idx], ...body };
+        saveDb(db);
+        return sendJson(res, { success: true, rubro: db.rubros[idx] });
+      }
+      return sendJson(res, { error: 'Rubro no encontrado' }, 404);
+    }
+
+    if (pathname.startsWith('/api/admin/rubros/') && method === 'DELETE') {
+      const id = pathname.split('/')[4];
+      const db = getDb();
+      db.rubros = db.rubros.filter(r => r.id !== id);
+      saveDb(db);
+      return sendJson(res, { success: true });
     }
 
     if (pathname === '/api/admin/upload' && method === 'POST') {
@@ -335,6 +380,8 @@ async function requestHandler(req, res) {
           rubroId: sub.rubroId,
           rubroNombre: sub.rubroNombre,
           plan: body.plan || 'gratuito',
+          posicionTop: body.posicionTop || false,
+          colorPersonalizado: body.colorPersonalizado || '',
           direccion: sub.direccion,
           telefono: sub.telefono,
           whatsapp: sub.whatsapp,
@@ -376,6 +423,8 @@ async function requestHandler(req, res) {
         rubroId: body.rubroId || 'servicios',
         rubroNombre: rubroObj.nombre,
         plan: body.plan || 'gratuito',
+        posicionTop: body.posicionTop || false,
+        colorPersonalizado: body.colorPersonalizado || '',
         direccion: body.direccion || 'Chascomús',
         telefono: body.telefono || '',
         whatsapp: body.whatsapp || ('549' + (body.telefono || '').replace(/\D/g, '')),

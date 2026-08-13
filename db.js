@@ -58,7 +58,7 @@ const INITIAL_DATA = {
   popups: [
     {
       id: 'pop_main',
-      ubicacion: 'portada', // 'portada' o rubroId
+      ubicacion: 'portada',
       activo: true,
       titulo: '¡SÚPER PROMO FIN DE SEMANA EN LAGUNA!',
       subtitulo: 'Heladería El Faro - 2x1 en Kilo de Helado',
@@ -85,7 +85,9 @@ const INITIAL_DATA = {
       nombre: 'Pizzería & Restaurante La Laguna',
       rubroId: 'gastronomia',
       rubroNombre: 'Gastronomía & Comidas',
-      plan: 'destacado',
+      plan: 'oro', // 'gratuito', 'plata', 'oro'
+      posicionTop: true,
+      colorPersonalizado: '#f59e0b',
       direccion: 'Av. Costanera España 450, Chascomús',
       telefono: '2241-554433',
       whatsapp: '5492241527357',
@@ -104,7 +106,9 @@ const INITIAL_DATA = {
       nombre: 'Carpintería El Roble - Muebles a Medida',
       rubroId: 'carpinteria',
       rubroNombre: 'Carpintería & Muebles',
-      plan: 'destacado',
+      plan: 'plata',
+      posicionTop: false,
+      colorPersonalizado: '#0284c7',
       direccion: 'Calle Lincoln 320, Chascomús',
       telefono: '2241-667788',
       whatsapp: '5492241527357',
@@ -123,47 +127,17 @@ const INITIAL_DATA = {
       rubroId: 'ferreteria',
       rubroNombre: 'Ferreterías & Materiales',
       plan: 'gratuito',
+      posicionTop: false,
+      colorPersonalizado: '',
       direccion: 'Calle Italia 120, Chascomús',
       telefono: '2241-423344',
-      whatsapp: '5492241527357',
+      whatsapp: '5492241423344',
       descripcion: 'Herramientas, buloneria, pintura, artículos de plomería y electricidad. Aceptamos todas las tarjetas y Cuenta DNI.',
       horarios: 'Lunes a Sábado de 08:00 a 19:30 hs',
       redes: '',
       fotos: [],
       verificado: true,
       fechaAlta: '2026-08-03'
-    },
-    {
-      id: 'l4',
-      nombre: 'Juan Pérez - Plomero y Gasista Matriculado',
-      rubroId: 'plomeria',
-      rubroNombre: 'Plomería & Gas Matriculado',
-      plan: 'gratuito',
-      direccion: 'Chascomús y zonas rurales',
-      telefono: '2241-612345',
-      whatsapp: '5492241527357',
-      descripcion: 'Urgencias 24 hs. Instalaciones de agua, cloacas, colocación de sanitarios, termotanques y reparaciones de gas.',
-      horarios: 'Urgencias 24 Horas',
-      redes: '',
-      fotos: [],
-      verificado: true,
-      fechaAlta: '2026-08-04'
-    },
-    {
-      id: 'l5',
-      nombre: 'Albañilería y Construcción Olmos',
-      rubroId: 'albanileria',
-      rubroNombre: 'Albañilería & Reformas',
-      plan: 'gratuito',
-      direccion: 'Chascomús',
-      telefono: '2241-698765',
-      whatsapp: '5492241527357',
-      descripcion: 'Obras de cero, refacciones, colocación de cerámicos, revoques, losas y pintura en general. Trabajos garantizados.',
-      horarios: 'Lunes a Sábado de 07:30 a 18:00 hs',
-      redes: '',
-      fotos: [],
-      verificado: true,
-      fechaAlta: '2026-08-05'
     }
   ],
   submissions: [],
@@ -178,9 +152,8 @@ export function getDb() {
   try {
     const raw = fs.readFileSync(DATA_FILE, 'utf-8');
     const data = JSON.parse(raw);
-    if (!data.popups) {
-      data.popups = INITIAL_DATA.popups;
-    }
+    if (!data.rubros || data.rubros.length === 0) data.rubros = INITIAL_DATA.rubros;
+    if (!data.popups) data.popups = INITIAL_DATA.popups;
     return data;
   } catch (err) {
     console.error('Error al leer la base de datos:', err);
