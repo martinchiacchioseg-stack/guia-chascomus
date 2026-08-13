@@ -1,5 +1,5 @@
 // ==========================================================================
-// GUÍA CHASCOMÚS - CLIENT APPLICATION LOGIC (v14.0 - DUTY PHARMACIES & ROLFI FIXES)
+// GUÍA CHASCOMÚS - CLIENT APPLICATION LOGIC (v15.0 - TOP MENU & REFINED UI)
 // Branding: Desarrollado por rolϕ
 // WhatsApp: 5492241527357
 // ==========================================================================
@@ -259,16 +259,21 @@ function renderNavbar() {
           <div class="brand-icon">🏛️</div>
           <div class="brand-text">
             <h1>Guía Chascomús</h1>
-            <span>Comercio & Servicios <span class="dev-badge">Desarrollado por <span class="phi">rolϕ</span></span></span>
+            <span class="dev-badge">Desarrollado por <span class="phi">rolϕ</span></span>
           </div>
         </div>
+
+        <nav class="top-menu-links">
+          <a href="#hero-section" onclick="window.resetFilters()">🏠 Inicio</a>
+          <a href="#pharmacies-section">❇️ Farmacia de Guardia</a>
+          <a href="#rubros-section">🏷️ Categorías</a>
+          <a href="#muni-section">🏛️ Novedades Municipales</a>
+          <a href="javascript:void(0)" onclick="window.toggleAiChat()">🤖 Rolfi</a>
+        </nav>
         
         <div class="nav-actions">
-          <button class="btn btn-ai" onclick="window.toggleAiChat()">
-            🤖 Asistente Rolfi
-          </button>
           <button class="btn btn-whatsapp" onclick="window.openWhatsAppAdmin()">
-            💬 Publicá por WhatsApp
+            💬 WhatsApp
           </button>
           <button class="btn btn-primary" onclick="window.openSubmitModal()">
             ➕ Publicá Gratis
@@ -281,13 +286,13 @@ function renderNavbar() {
 
 function renderHero() {
   return `
-    <section class="hero">
+    <section class="hero" id="hero-section">
       <div class="hero-bg-pattern"></div>
       <div class="hero-content">
-        <div class="hero-badge">📍 Chascomús, Provincia de Buenos Aires</div>
-        <h2>Encontrá todo en Chascomús</h2>
-        <p style="font-size: 1.15rem; font-weight: 500; margin-bottom: 20px; opacity: 0.95;">
-          🤖 <strong>Asistente Virtual Rolfi:</strong> <em>Pregúntale lo que quieras y te guiará</em>
+        <div class="hero-badge">📍 Chascomús, Buenos Aires</div>
+        <h2>Directorio Digital de Comercios & Servicios</h2>
+        <p style="font-size: 1.05rem; font-weight: 500; margin-bottom: 12px; opacity: 0.95;">
+          🤖 <strong>Rolfi:</strong> <em>Pregúntale lo que quieras y te guiará</em>
         </p>
         
         <form onsubmit="window.handleHeroAiSubmit(event)" class="search-box" style="border: 2px solid #8b5cf6;">
@@ -342,7 +347,6 @@ function renderPharmCard(f, isDeTurno) {
   `;
 }
 
-// SOLO SE MUESTRAN LAS FARMACIAS QUE ESTÁN DE TURNO
 function renderFarmaciasSection() {
   if (!state.farmacias || state.farmacias.length === 0) return '';
 
@@ -351,9 +355,9 @@ function renderFarmaciasSection() {
 
   if (deTurno.length === 0) {
     return `
-      <section style="margin-bottom: 24px;">
+      <section id="pharmacies-section" style="margin-bottom: 24px; scroll-margin-top: 70px;">
         <div class="section-title">
-          <h3>❇️ Farmacias de Guardia hoy en Chascomús</h3>
+          <h3>❇️ Farmacia de Guardia hoy en Chascomús</h3>
           <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 500;">Hoy ${dutyInfo.dayName} ${dutyInfo.shortDate} — Guardia 08:00 a 08:00 hs</span>
         </div>
         <div style="background: white; padding: 14px 18px; border-radius: var(--radius-md); border: 1px solid var(--border); font-size: 0.9rem; color: var(--text-muted); text-align: center;">
@@ -364,7 +368,7 @@ function renderFarmaciasSection() {
   }
 
   return `
-    <section style="margin-bottom: 28px;">
+    <section id="pharmacies-section" style="margin-bottom: 24px; scroll-margin-top: 70px;">
       <div class="section-title">
         <h3>❇️ Farmacia de Guardia activa hoy en Chascomús</h3>
         <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 500;">Hoy ${dutyInfo.dayName} ${dutyInfo.shortDate} — Guardia 08:00 a 08:00 hs</span>
@@ -381,47 +385,32 @@ function renderMunicipalEventsSection() {
   if (!state.eventosMunicipales || state.eventosMunicipales.length === 0) return '';
 
   return `
-    <section style="margin-bottom: 30px; background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); padding: 18px 20px; border-radius: var(--radius-lg); border: 1px solid #bae6fd;">
-      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 12px;">
-        <div>
-          <h3 style="font-size: 1.15rem; color: #0369a1; font-weight: 800; display: flex; align-items: center; gap: 8px;">
-            🏛️ Novedades & Eventos Municipales
-          </h3>
-          <p style="font-size: 0.82rem; color: #0284c7;">
-            Hacé clic en cualquier tarjeta para leer la información completa.
-          </p>
-        </div>
-
-        <button onclick="window.toggleAdmin()" class="btn btn-primary" style="font-size: 0.78rem; padding: 6px 12px; background: #0284c7;">
-          ⚡ Cargar / Importar
-        </button>
+    <section id="muni-section" style="margin-bottom: 24px; background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); padding: 14px 16px; border-radius: var(--radius-md); border: 1px solid #bae6fd; scroll-margin-top: 70px;">
+      <div style="margin-bottom: 8px;">
+        <h3 style="font-size: 1.05rem; color: #0369a1; font-weight: 800; display: flex; align-items: center; gap: 6px; margin: 0;">
+          🏛️ Novedades & Eventos Municipales
+        </h3>
+        <span style="font-size: 0.78rem; color: #0284c7;">
+          Hacé clic en cualquier comunicado para ver la información completa.
+        </span>
       </div>
 
-      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px;">
         ${state.eventosMunicipales.map(evt => `
           <div 
             onclick="window.openEventDetailModal('${evt.id}')"
-            style="background: white; border-radius: var(--radius-md); border: 1px solid #bae6fd; overflow: hidden; box-shadow: var(--shadow-sm); cursor: pointer; transition: transform 0.15s ease;"
+            style="background: white; border-radius: var(--radius-sm); border: 1px solid #bae6fd; padding: 8px 10px; box-shadow: var(--shadow-sm); cursor: pointer; transition: transform 0.15s ease;"
             onmouseover="this.style.transform='translateY(-2px)'"
             onmouseout="this.style.transform='none'"
           >
-            ${evt.imagen ? `<img src="${evt.imagen}" style="width: 100%; height: 100px; object-fit: cover;" />` : ''}
-            <div style="padding: 10px 12px;">
-              <span style="background: #e0f2fe; color: #0369a1; font-size: 0.68rem; font-weight: 700; padding: 2px 6px; border-radius: 99px; text-transform: uppercase;">
-                ${evt.categoria || 'Municipal'}
-              </span>
-              <h4 style="font-size: 0.95rem; font-weight: 700; margin: 6px 0 2px; color: var(--text-main); line-height: 1.25;">
-                ${evt.titulo}
-              </h4>
-              <div style="font-size: 0.78rem; color: #0284c7; font-weight: 600; margin-bottom: 4px;">
-                📅 ${evt.fecha}
-              </div>
-              <p style="font-size: 0.8rem; color: var(--text-muted); line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
-                ${evt.descripcion}
-              </p>
-              <span style="display: inline-block; margin-top: 6px; font-size: 0.75rem; color: var(--primary); font-weight: 700;">
-                📖 Leer más...
-              </span>
+            <span style="background: #e0f2fe; color: #0369a1; font-size: 0.65rem; font-weight: 700; padding: 2px 6px; border-radius: 99px; text-transform: uppercase;">
+              ${evt.categoria || 'Municipal'}
+            </span>
+            <h4 style="font-size: 0.88rem; font-weight: 700; margin: 4px 0 2px; color: var(--text-main); line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+              ${evt.titulo}
+            </h4>
+            <div style="font-size: 0.72rem; color: #0284c7; font-weight: 600;">
+              📅 ${evt.fecha}
             </div>
           </div>
         `).join('')}
@@ -461,7 +450,7 @@ function renderEventDetailModal() {
 
 function renderRubrosSection() {
   return `
-    <section style="margin-bottom: 30px;" id="rubros-section">
+    <section style="margin-bottom: 26px;" id="rubros-section">
       <div class="section-title">
         <h3>Categorías & Rubros</h3>
       </div>
@@ -494,7 +483,6 @@ function renderListingsSection() {
   let rubroObj = state.rubros.find(r => r.id === state.selectedRubro);
 
   if (state.selectedRubro === 'farmacias') {
-    // Si eligieron el rubro farmacias, mostrar todas las farmacias registradas
     return `
       <section id="listings-section" style="scroll-margin-top: 80px;">
         <div class="section-title" style="display: flex; justify-content: space-between; align-items: center;">
