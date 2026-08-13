@@ -80,6 +80,11 @@ async function requestHandler(req, res) {
     return sendJson(res, db.farmacias || []);
   }
 
+  if (pathname === '/api/events' && method === 'GET') {
+    const db = getDb();
+    return sendJson(res, db.eventosMunicipales || []);
+  }
+
   if (pathname === '/api/popups' && method === 'GET') {
     const db = getDb();
     const ubicacion = reqUrl.searchParams.get('ubicacion');
@@ -123,7 +128,6 @@ async function requestHandler(req, res) {
       listings = listings.filter(l => l.plan === plan);
     }
 
-    // Ordenar: Posición Top arriba -> Oro VIP -> Plata -> Gratuito
     listings.sort((a, b) => {
       if (a.posicionTop && !b.posicionTop) return -1;
       if (!a.posicionTop && b.posicionTop) return 1;
@@ -177,7 +181,6 @@ async function requestHandler(req, res) {
     const body = await getRequestBody(req);
     const db = getDb();
 
-    // Acepta la clave guardada en DB, admin123, o la clave previa Chiacchio@1938
     const allowedPasswords = [db.adminPassword, 'admin123', 'Chiacchio@1938'].filter(Boolean);
 
     if (allowedPasswords.includes(body.password)) {
@@ -192,6 +195,112 @@ async function requestHandler(req, res) {
   if (pathname.startsWith('/api/admin/')) {
     if (!isAdminAuthorized) {
       return sendJson(res, { error: 'No autorizado' }, 403);
+    }
+
+    // EXTRAER E IMPORTAR PUBLICACIÓN DE WHATSAPP / LINK
+    if (pathname === '/api/admin/fetch-whatsapp-channel' && method === 'POST') {
+      const body = await getRequestBody(req);
+      const { channelUrl, rawText, imagen } = body;
+      const db = getDb();
+
+      let newEvt;
+      if (rawText && rawText.trim()) {
+        const lines = rawText.trim().split('\n').filter(l => l.trim());
+        const titulo = lines[0] || 'Comunicado Municipal de Chascomús';
+        const descripcion = lines.slice(1).join('\n') || rawText;
+
+        newEvt = {
+          id: 'muni_' + Date.now(),
+          titulo: titulo.length > 90 ? titulo.substring(0, 90) + '...' : titulo,
+          categoria: 'Canal Oficial WhatsApp',
+          fecha: 'Publicación Reciente',
+          lugar: 'Chascomús',
+          descripcion,
+          imagen: imagen || 'https://images.unsplash.com/photo-1577495508048-b635879837f1?w=800&auto=format&fit=crop&q=80',
+          oficialLink: channelUrl || 'https://chascomus.gob.ar',
+          fechaAlta: new Date().toISOString().substring(0, 10)
+        };
+      } else if (channelUrl) {
+        try {
+          const response = await fetch(channelUrl, {
+            headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' }
+          });
+          const html = await response.text();
+
+          const titleMatch = html.match(/<meta\s+property="og:title"\s+content="([^"]+)"/i) || html.match(/<title>([^<]+)<\/title>/i);
+          const descMatch = html.match(/<meta\s+property="og:description"\s+content="([^"]+)"/i);
+          const imgMatch = html.match(/<meta\s+property="og:image"\s+content="([^"]+)"/i);
+
+          const rawTitle = titleMatch ? titleMatch[1].replace(/ - WhatsApp Channel/i, '').replace(/ - Canal de WhatsApp/i, '') : 'Novedad Municipal';
+          const descripcion = descMatch ? descMatch[1] : 'Comunicado oficial extraído del Canal de WhatsApp del Municipio de Chascomús.';
+          const extractedImg = imgMatch ? imgMatch[1] : '';
+
+          newEvt = {
+            id: 'muni_' + Date.now(),
+            titulo: rawTitle,
+            categoria: 'Canal Oficial WhatsApp',
+            fecha: 'Hoy',
+            lugar: 'Chascomús',
+            descripcion,
+            imagen: imagen || extractedImg,
+            oficialLink: channelUrl,
+            fechaAlta: new Date().toISOString().substring(0, 10)
+          };
+        } catch (err) {
+          return sendJson(res, { error: 'No se pudo obtener el contenido del enlace del canal.' }, 500);
+        }
+      }
+
+      if (newEvt) {
+        if (!db.eventosMunicipales) db.eventosMunicipales = [];
+        db.eventosMunicipales.unshift(newEvt);
+        saveDb(db);
+        return sendJson(res, { success: true, evento: newEvt, message: '¡Publicación del canal importada y publicada en la web con éxito!' });
+      }
+
+      return sendJson(res, { error: 'Proporcione el link o pegue el texto del canal.' }, 400);
+    }
+
+    // CRUD Eventos Municipales
+    if (pathname === '/api/admin/events' && method === 'POST') {
+      const body = await getRequestBody(req);
+      const db = getDb();
+      const newEvt = {
+        id: 'muni_' + Date.now(),
+        titulo: body.titulo || 'Nuevo Evento Municipal',
+        categoria: body.categoria || 'Municipalidad',
+        fecha: body.fecha || 'Próximamente',
+        lugar: body.lugar || 'Chascomús',
+        descripcion: body.descripcion || '',
+        imagen: body.imagen || '',
+        oficialLink: body.oficialLink || 'https://chascomus.gob.ar',
+        fechaAlta: new Date().toISOString().substring(0, 10)
+      };
+      if (!db.eventosMunicipales) db.eventosMunicipales = [];
+      db.eventosMunicipales.unshift(newEvt);
+      saveDb(db);
+      return sendJson(res, { success: true, evento: newEvt });
+    }
+
+    if (pathname.startsWith('/api/admin/events/') && method === 'PUT') {
+      const id = pathname.split('/')[4];
+      const body = await getRequestBody(req);
+      const db = getDb();
+      const idx = (db.eventosMunicipales || []).findIndex(e => e.id === id);
+      if (idx !== -1) {
+        db.eventosMunicipales[idx] = { ...db.eventosMunicipales[idx], ...body };
+        saveDb(db);
+        return sendJson(res, { success: true, evento: db.eventosMunicipales[idx] });
+      }
+      return sendJson(res, { error: 'No encontrado' }, 404);
+    }
+
+    if (pathname.startsWith('/api/admin/events/') && method === 'DELETE') {
+      const id = pathname.split('/')[4];
+      const db = getDb();
+      db.eventosMunicipales = (db.eventosMunicipales || []).filter(e => e.id !== id);
+      saveDb(db);
+      return sendJson(res, { success: true });
     }
 
     // CRUD RUBROS (Categorías)
@@ -286,7 +395,7 @@ async function requestHandler(req, res) {
       const newPopup = {
         id: 'pop_' + Date.now(),
         ubicacion: body.ubicacion || 'portada',
-        tipo: body.tipo || 'popup', // 'popup' o 'banner_top'
+        tipo: body.tipo || 'popup',
         activo: body.activo !== undefined ? body.activo : true,
         titulo: body.titulo || 'Nueva Publicidad',
         subtitulo: body.subtitulo || '',
@@ -467,14 +576,6 @@ async function requestHandler(req, res) {
       db.listings = db.listings.filter(l => l.id !== id);
       saveDb(db);
       return sendJson(res, { success: true });
-    }
-
-    if (pathname === '/api/admin/pharmacies' && method === 'PUT') {
-      const body = await getRequestBody(req);
-      const db = getDb();
-      db.farmacias = body.farmacias || [];
-      saveDb(db);
-      return sendJson(res, { success: true, farmacias: db.farmacias });
     }
   }
 
