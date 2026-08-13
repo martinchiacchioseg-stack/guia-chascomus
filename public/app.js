@@ -1,5 +1,5 @@
 // ==========================================================================
-// GUÍA CHASCOMÚS - CLIENT APPLICATION LOGIC (v11.0 - ROLFI AI ASSISTANT INTEGRATION)
+// GUÍA CHASCOMÚS - CLIENT APPLICATION LOGIC (v13.0 - WHATSAPP CHANNEL IMPORTER)
 // Branding: Desarrollado por rolϕ
 // WhatsApp: 5492241527357
 // ==========================================================================
@@ -10,6 +10,7 @@ const state = {
   popups: [],
   activePopup: null,
   listings: [],
+  eventosMunicipales: [],
   selectedRubro: 'todos',
   searchQuery: '',
   showSubmitModal: false,
@@ -19,6 +20,7 @@ const state = {
   showPharmacyFormModal: false,
   showPopupFormModal: false,
   showRubroFormModal: false,
+  showEventFormModal: false,
   editingItem: null,
   isAdmin: false,
   adminToken: null,
@@ -32,7 +34,7 @@ const state = {
   aiMessages: [
     {
       sender: 'bot',
-      text: '¡Hola! 👋 Soy **Rolfi**, tu Asistente Virtual en Guía Chascomús. Pregúntame lo que quieras y te guiaré (ej: "necesito un plomero urgente", "farmacia de guardia", "dónde comer pizza").'
+      text: '¡Hola! 👋 Soy **Rolfi**, tu Asistente Virtual en Guía Chascomús. Pregúntame lo que quieras y te guiaré (ej: "necesito un plomero urgente", "farmacia de guardia", "eventos del municipio").'
     }
   ]
 };
@@ -157,17 +159,19 @@ document.addEventListener('DOMContentLoaded', async () => {
 
 async function loadAppData() {
   try {
-    const [rubrosRes, farmaciasRes, popupsRes, listingsRes] = await Promise.all([
+    const [rubrosRes, farmaciasRes, popupsRes, listingsRes, eventsRes] = await Promise.all([
       fetch('/api/rubros'),
       fetch('/api/pharmacies'),
       fetch('/api/popups'),
-      fetch('/api/listings')
+      fetch('/api/listings'),
+      fetch('/api/events')
     ]);
 
     state.rubros = await rubrosRes.json();
     state.farmacias = await farmaciasRes.json();
     state.popups = await popupsRes.json();
     state.listings = await listingsRes.json();
+    state.eventosMunicipales = await eventsRes.json();
 
     if (state.isAdmin && state.adminToken) {
       await fetchPendingSubmissions();
@@ -224,6 +228,7 @@ function renderApp() {
     
     <main class="main-container">
       ${renderFarmaciasSection()}
+      ${renderMunicipalEventsSection()}
       ${renderRubrosSection()}
       ${renderListingsSection()}
     </main>
@@ -239,6 +244,7 @@ function renderApp() {
     ${state.showPharmacyFormModal ? renderPharmacyFormModal() : ''}
     ${state.showPopupFormModal ? renderPopupFormModal() : ''}
     ${state.showRubroFormModal ? renderRubroFormModal() : ''}
+    ${state.showEventFormModal ? renderEventFormModal() : ''}
   `;
 }
 
@@ -365,6 +371,49 @@ function renderFarmaciasSection() {
       <div class="pharmacy-card-grid">
         ${deTurno.map(f => renderPharmCard(f, true)).join('')}
         ${regulares.map(f => renderPharmCard(f, false)).join('')}
+      </div>
+    </section>
+  `;
+}
+
+function renderMunicipalEventsSection() {
+  return `
+    <section style="margin-bottom: 36px; background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%); padding: 22px; border-radius: var(--radius-lg); border: 1px solid #bae6fd;">
+      <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
+        <div>
+          <h3 style="font-size: 1.3rem; color: #0369a1; font-weight: 800; display: flex; align-items: center; gap: 8px;">
+            🏛️ Novedades & Eventos Municipales de Chascomús
+          </h3>
+          <p style="font-size: 0.88rem; color: #0284c7; margin-top: 2px;">
+            Agenda cultural, actividades comunitarias e informes oficiales del municipio directo en la pantalla.
+          </p>
+        </div>
+
+        <button onclick="window.toggleAdmin()" class="btn btn-primary" style="font-size: 0.8rem; background: #0284c7;">
+          ⚡ Importar Publicaciones de WhatsApp
+        </button>
+      </div>
+
+      <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px;">
+        ${state.eventosMunicipales.map(evt => `
+          <div style="background: white; border-radius: var(--radius-md); border: 1px solid #e0f2fe; overflow: hidden; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; justify-content: space-between;">
+            ${evt.imagen ? `<img src="${evt.imagen}" style="width: 100%; height: 140px; object-fit: cover;" />` : ''}
+            <div style="padding: 14px; flex: 1;">
+              <span style="background: #e0f2fe; color: #0369a1; font-size: 0.72rem; font-weight: 700; padding: 3px 8px; border-radius: 99px; text-transform: uppercase;">
+                ${evt.categoria || 'Municipal'}
+              </span>
+              <h4 style="font-size: 1.05rem; font-weight: 700; margin: 8px 0 4px; color: var(--text-main); line-height: 1.25;">
+                ${evt.titulo}
+              </h4>
+              <div style="font-size: 0.8rem; color: #0284c7; font-weight: 600; margin-bottom: 6px;">
+                📅 ${evt.fecha} — 📍 ${evt.lugar}
+              </div>
+              <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.35; white-space: pre-line;">
+                ${evt.descripcion}
+              </p>
+            </div>
+          </div>
+        `).join('')}
       </div>
     </section>
   `;
@@ -534,9 +583,9 @@ function renderAiAssistantWidget() {
         <div style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 4px; font-weight: 600;">Sugerencias para Rolfi:</div>
         <div class="ai-quick-prompts">
           <button class="ai-prompt-chip" onclick="window.askAiPrompt('¿Qué farmacia está de guardia hoy?')">💊 Farmacia de guardia</button>
+          <button class="ai-prompt-chip" onclick="window.askAiPrompt('¿Qué eventos hay en Chascomús?')">🏛️ Eventos municipales</button>
           <button class="ai-prompt-chip" onclick="window.askAiPrompt('Necesito un plomero o gasista')">🔧 Plomero o Gasista</button>
           <button class="ai-prompt-chip" onclick="window.askAiPrompt('Quiero pedir pizza o comida')">🍕 Comida a domicilio</button>
-          <button class="ai-prompt-chip" onclick="window.askAiPrompt('Pedir un remis')">🚕 Remis</button>
         </div>
       </div>
 
@@ -591,7 +640,14 @@ window.handleAiMessageSubmit = function(e) {
   const textLower = text.toLowerCase();
   let botReply = '';
 
-  if (textLower.includes('farmacia') || textLower.includes('guardia') || textLower.includes('remedio') || textLower.includes('medicamento')) {
+  if (textLower.includes('evento') || textLower.includes('municip') || textLower.includes('cultura') || textLower.includes('teatro') || textLower.includes('maraton')) {
+    if (state.eventosMunicipales.length > 0) {
+      const topEvt = state.eventosMunicipales[0];
+      botReply = `🏛️ ¡Sí! En la sección de Novedades Municipales tenés los últimos eventos. El destacado es: **${topEvt.titulo}** (${topEvt.fecha} en ${topEvt.lugar}).`;
+    } else {
+      botReply = `🏛️ Podés ver todos los eventos e informes del municipio en el bloque oficial arriba de las categorías.`;
+    }
+  } else if (textLower.includes('farmacia') || textLower.includes('guardia') || textLower.includes('remedio') || textLower.includes('medicamento')) {
     const dutyInfo = getPharmDutyDateInfo();
     const deTurno = state.farmacias.filter(f => isPharmDeTurnoToday(f));
     if (deTurno.length > 0) {
@@ -766,6 +822,9 @@ function renderAdminModal() {
         <button class="tab-btn ${state.adminTab === 'pending' ? 'active' : ''}" onclick="window.setAdminTab('pending')">
           📩 Solicitudes Pendientes (${state.pendingSubmissions.length})
         </button>
+        <button class="tab-btn ${state.adminTab === 'events' ? 'active' : ''}" onclick="window.setAdminTab('events')">
+          🏛️ Eventos Municipales (${state.eventosMunicipales.length})
+        </button>
         <button class="tab-btn ${state.adminTab === 'rubros' ? 'active' : ''}" onclick="window.setAdminTab('rubros')">
           🏷️ Categorías / Rubros (${state.rubros.length})
         </button>
@@ -785,6 +844,7 @@ function renderAdminModal() {
 
       <div class="admin-fullscreen-body">
         ${state.adminTab === 'pending' ? renderAdminPendingTab() : ''}
+        ${state.adminTab === 'events' ? renderAdminEventsTab() : ''}
         ${state.adminTab === 'rubros' ? renderAdminRubrosTab() : ''}
         ${state.adminTab === 'listings' ? renderAdminListingsTab() : ''}
         ${state.adminTab === 'pharmacies' ? renderAdminPharmaciesTab() : ''}
@@ -819,7 +879,7 @@ function renderAdminPendingTab() {
               <td>${s.rubroNombre}</td>
               <td>
                 <span style="font-weight: 700; color: ${s.planDeseado === 'oro' ? 'var(--accent-gold)' : s.planDeseado === 'plata' ? 'var(--primary)' : 'var(--text-muted)'}">
-                  ${s.planDeseado === 'oro' ? '⭐ ORO VIP' : s.planDeseado === 'plata' ? '🔹 PLATA' : 'GRATUITION'}
+                  ${s.planDeseado === 'oro' ? '⭐ ORO VIP' : s.planDeseado === 'plata' ? '🔹 PLATA' : 'GRATUITO'}
                 </span>
               </td>
               <td>📞 ${s.telefono}</td>
@@ -833,6 +893,56 @@ function renderAdminPendingTab() {
           `).join('')}
         </tbody>
       </table>
+    </div>
+  `;
+}
+
+function renderAdminEventsTab() {
+  return `
+    <div>
+      <div style="background: #e0f2fe; border: 1px solid #bae6fd; padding: 18px; border-radius: var(--radius-md); margin-bottom: 20px;">
+        <h4 style="color: #0369a1; margin-bottom: 6px;">⚡ Importador Automático del Canal de WhatsApp Municipal</h4>
+        <p style="font-size: 0.85rem; color: #0284c7; margin-bottom: 12px;">
+          Ingresá el link del canal o copiá y pegá directamente el texto publicado en WhatsApp para que aparezca publicado en la web sin que nadie tenga que salir de la página.
+        </p>
+
+        <form onsubmit="window.handleWhatsAppImport(event)" style="display: flex; flex-direction: column; gap: 10px;">
+          <input type="text" id="importChannelUrl" placeholder="Ej: https://whatsapp.com/channel/0029Va... (Link del canal)" />
+          <textarea id="importRawText" rows="2" placeholder="O pegá aquí el texto del comunicado publicado en WhatsApp..."></textarea>
+          <button type="submit" class="btn btn-primary" style="align-self: flex-start;">⚡ Importar e Publicar Automáticamente</button>
+        </form>
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h4>Publicaciones Municipales Activas (${state.eventosMunicipales.length})</h4>
+        <button class="btn btn-outline" onclick="window.openEventFormModal(null)">+ Cargar Manualmente</button>
+      </div>
+
+      <div class="table-responsive">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Título / Evento</th>
+              <th>Categoría</th>
+              <th>Fecha & Lugar</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${state.eventosMunicipales.map(e => `
+              <tr>
+                <td><strong>${e.titulo}</strong><br><small>${(e.descripcion || '').substring(0, 70)}...</small></td>
+                <td><span class="day-badge">${e.categoria || 'Municipal'}</span></td>
+                <td>📅 ${e.fecha}<br>📍 ${e.lugar}</td>
+                <td>
+                  <button class="btn btn-outline" style="font-size: 0.8rem;" onclick="window.openEventFormModal('${e.id}')">✏️ Editar</button>
+                  <button class="btn btn-outline" style="font-size: 0.8rem; color: red;" onclick="window.deleteEvent('${e.id}')">🗑️ Borrar</button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
     </div>
   `;
 }
@@ -1070,6 +1180,62 @@ function renderAdminSecurityTab() {
 }
 
 // ---------------- MODALES DE FORMULARIOS ADMIN ---------------- //
+
+function renderEventFormModal() {
+  const e = state.editingItem || {};
+  const isEdit = !!e.id;
+
+  return `
+    <div class="modal-overlay">
+      <div class="form-modal-content">
+        <button class="modal-close-btn" onclick="window.closeEventFormModal()">✕</button>
+        <h3>${isEdit ? 'Editar Evento Municipal' : 'Nuevo Evento / Informe Municipal'}</h3>
+
+        <form onsubmit="window.saveEventForm(event)">
+          <div class="form-group">
+            <label>Título del Evento o Comunicado *</label>
+            <input type="text" id="editEvtTitulo" value="${e.titulo || ''}" required placeholder="Ej: 🎭 Noche de los Teatros en el Brazzola" />
+          </div>
+
+          <div class="form-group">
+            <label>Categoría *</label>
+            <input type="text" id="editEvtCategoria" value="${e.categoria || 'Cultura & Espectáculos'}" required placeholder="Ej: Cultura / Deportes / Turismo" />
+          </div>
+
+          <div class="form-group">
+            <label>Fecha y Hora *</label>
+            <input type="text" id="editEvtFecha" value="${e.fecha || ''}" required placeholder="Ej: Sábado 15 de Agosto - 20:00 hs" />
+          </div>
+
+          <div class="form-group">
+            <label>Lugar en Chascomús *</label>
+            <input type="text" id="editEvtLugar" value="${e.lugar || ''}" required placeholder="Ej: Teatro Municipal Brazzola / Parque Libres del Sur" />
+          </div>
+
+          <div class="form-group">
+            <label>Descripción *</label>
+            <textarea id="editEvtDescripcion" rows="3" required>${e.descripcion || ''}</textarea>
+          </div>
+
+          <div class="form-group">
+            <label>Imagen Promocional (URL o subir)</label>
+            <input type="text" id="editEvtImagen" value="${e.imagen || ''}" placeholder="URL de la foto del evento" />
+          </div>
+
+          <div class="form-group">
+            <label>Enlace Oficial o Canal de WhatsApp Municipal</label>
+            <input type="text" id="editEvtOficialLink" value="${e.oficialLink || 'https://chascomus.gob.ar'}" />
+          </div>
+
+          <div style="display: flex; gap: 10px; margin-top: 20px;">
+            <button type="button" class="btn btn-outline" style="flex:1;" onclick="window.closeEventFormModal()">Cancelar</button>
+            <button type="submit" class="btn btn-primary" style="flex:1;">${isEdit ? 'Guardar Cambios' : 'Publicar Evento'}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+}
 
 function renderListingFormModal() {
   const l = state.editingItem || {};
@@ -1345,6 +1511,34 @@ function renderFooter() {
 
 // ---------------- ACCIONES GLOBALES Y MANEJADORES ---------------- //
 
+window.handleWhatsAppImport = async function(e) {
+  e.preventDefault();
+  const channelUrl = document.getElementById('importChannelUrl').value;
+  const rawText = document.getElementById('importRawText').value;
+
+  if (!channelUrl.trim() && !rawText.trim()) {
+    return alert('Por favor ingresá el link del canal o pegá el texto del comunicado.');
+  }
+
+  try {
+    const res = await fetch('/api/admin/fetch-whatsapp-channel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${state.adminToken}` },
+      body: JSON.stringify({ channelUrl, rawText })
+    });
+    const data = await res.json();
+    if (data.success) {
+      await loadAppData();
+      renderApp();
+      alert(data.message || '¡Publicación del canal importada con éxito!');
+    } else {
+      alert(data.error || 'Error al importar');
+    }
+  } catch (err) {
+    alert('Error de conexión al importar del canal');
+  }
+};
+
 window.filterRubro = function(rubroId) {
   state.selectedRubro = rubroId;
   state.searchQuery = '';
@@ -1497,6 +1691,66 @@ async function fetchPendingSubmissions() {
     console.error('Error obteniendo solicitudes pendientes:', err);
   }
 }
+
+// Event Actions
+window.openEventFormModal = function(id) {
+  state.editingItem = id ? state.eventosMunicipales.find(e => e.id === id) : null;
+  state.showEventFormModal = true;
+  renderApp();
+};
+
+window.closeEventFormModal = function() {
+  state.showEventFormModal = false;
+  state.editingItem = null;
+  renderApp();
+};
+
+window.saveEventForm = async function(e) {
+  e.preventDefault();
+  const isEdit = state.editingItem && state.editingItem.id;
+  const body = {
+    titulo: document.getElementById('editEvtTitulo').value,
+    categoria: document.getElementById('editEvtCategoria').value,
+    fecha: document.getElementById('editEvtFecha').value,
+    lugar: document.getElementById('editEvtLugar').value,
+    descripcion: document.getElementById('editEvtDescripcion').value,
+    imagen: document.getElementById('editEvtImagen').value,
+    oficialLink: document.getElementById('editEvtOficialLink').value
+  };
+
+  const url = isEdit ? `/api/admin/events/${state.editingItem.id}` : '/api/admin/events';
+  const method = isEdit ? 'PUT' : 'POST';
+
+  try {
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${state.adminToken}` },
+      body: JSON.stringify(body)
+    });
+    if (res.ok) {
+      await loadAppData();
+      window.closeEventFormModal();
+      renderApp();
+      alert('¡Evento municipal guardado!');
+    }
+  } catch (err) {
+    alert('Error al guardar evento');
+  }
+};
+
+window.deleteEvent = async function(id) {
+  if (!confirm('¿Eliminar este evento municipal?')) return;
+  try {
+    await fetch(`/api/admin/events/${id}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${state.adminToken}` }
+    });
+    await loadAppData();
+    renderApp();
+  } catch (err) {
+    alert('Error al eliminar evento');
+  }
+};
 
 // Rubro Actions
 window.openRubroFormModal = function(id) {
