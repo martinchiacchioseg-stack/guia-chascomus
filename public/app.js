@@ -1,5 +1,5 @@
 // ==========================================================================
-// GUÍA CHASCOMÚS - CLIENT APPLICATION LOGIC (v10.0 - SMART AI SEARCH ASSISTANT)
+// GUÍA CHASCOMÚS - CLIENT APPLICATION LOGIC (v11.0 - ROLFI AI ASSISTANT INTEGRATION)
 // Branding: Desarrollado por rolϕ
 // WhatsApp: 5492241527357
 // ==========================================================================
@@ -26,20 +26,19 @@ const state = {
   pendingSubmissions: [],
   whatsappAdmin: '5492241527357',
   
-  // AI Assistant State
+  // AI Assistant State - ROLFI
   showAiChat: false,
   aiInputText: '',
   aiMessages: [
     {
       sender: 'bot',
-      text: '¡Hola! 👋 Soy el Asistente Virtual de Guía Chascomús. ¿En qué te puedo ayudar hoy? Escribime lo que buscás (ej: "necesito arreglar una canilla", "farmacia de turno", "dónde comer pizza") y te encuentro la mejor opción.'
+      text: '¡Hola! 👋 Soy **Rolfi**, tu Asistente Virtual en Guía Chascomús. Pregúntame lo que quieras y te guiaré (ej: "necesito un plomero urgente", "farmacia de guardia", "dónde comer pizza").'
     }
   ]
 };
 
 const DIAS_SEMANA = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 
-// Diccionario de Inteligencia para expansión semántica y sinónimos
 const SYNONYMS_MAP = {
   agua: ['plomeria', 'plomero', 'canilla', 'caño', 'humedad', 'tanque', 'termo', 'bomba', 'perdida'],
   gas: ['plomeria', 'gasista', 'garrafa', 'cocina', 'estufa', 'calefaccion'],
@@ -62,14 +61,11 @@ function performSmartSearch(query) {
   return state.listings.filter(l => {
     const textToMatch = `${l.nombre} ${l.descripcion} ${l.rubroNombre} ${l.direccion}`.toLowerCase();
     
-    // Coincidencia directa
     if (textToMatch.includes(q)) return true;
     
-    // Coincidencia palabra por palabra
     const matchesWord = words.some(w => w.length > 2 && textToMatch.includes(w));
     if (matchesWord) return true;
 
-    // Coincidencia por conceptos y sinónimos inteligentes
     for (const [key, synonyms] of Object.entries(SYNONYMS_MAP)) {
       const userAskedConcept = words.some(w => w.includes(key) || synonyms.includes(w));
       if (userAskedConcept) {
@@ -260,7 +256,7 @@ function renderNavbar() {
         
         <div class="nav-actions">
           <button class="btn btn-ai" onclick="window.toggleAiChat()">
-            🤖 Asistente IA
+            🤖 Asistente Rolfi
           </button>
           <button class="btn btn-whatsapp" onclick="window.openWhatsAppAdmin()">
             💬 Publicá por WhatsApp
@@ -281,18 +277,19 @@ function renderHero() {
       <div class="hero-content">
         <div class="hero-badge">📍 Chascomús, Provincia de Buenos Aires</div>
         <h2>Encontrá todo en Chascomús</h2>
-        <p>Buscá lo que necesitás en lenguaje natural o consultale a nuestro Asistente de IA.</p>
+        <p style="font-size: 1.15rem; font-weight: 500; margin-bottom: 20px; opacity: 0.95;">
+          🤖 <strong>Asistente Virtual Rolfi:</strong> <em>Pregúntale lo que quieras y te guiará</em>
+        </p>
         
-        <div class="search-box">
+        <form onsubmit="window.handleHeroAiSubmit(event)" class="search-box" style="border: 2px solid #8b5cf6;">
           <input 
             type="text" 
-            id="searchInput" 
-            placeholder="Ej: 'se me rompió una canilla', 'farmacia de turno', 'quiero pedir pizza'..."
+            id="heroAiInput" 
+            placeholder="Pregúntale a Rolfi lo que querés encontrar en Chascomús..."
             value="${state.searchQuery}"
-            oninput="window.onSearchChange(event)"
           />
-          <button class="btn btn-primary">🔍 Buscar con IA</button>
-        </div>
+          <button type="submit" class="btn btn-ai">✨ Preguntar a Rolfi</button>
+        </form>
       </div>
     </section>
   `;
@@ -421,7 +418,7 @@ function renderListingsSection() {
         <h3>${tituloSeccion}</h3>
         ${(state.selectedRubro !== 'todos' || state.searchQuery) ? `
           <button class="btn btn-outline" style="font-size: 0.82rem; padding: 6px 14px;" onclick="window.resetFilters()">
-            ✕ Limpiar Filtros
+            ✕ Ver Todos los Rubros
           </button>
         ` : ''}
       </div>
@@ -429,10 +426,10 @@ function renderListingsSection() {
       ${filtered.length === 0 ? `
         <div style="text-align: center; padding: 50px 20px; background: white; border-radius: var(--radius-md); border: 1px solid var(--border); box-shadow: var(--shadow-sm);">
           <p style="font-size: 1.2rem; color: var(--text-muted); margin-bottom: 12px;">
-            No se encontraron publicaciones para <strong>"${state.searchQuery}"</strong>.
+            Rolfi no encontró resultados para <strong>"${state.searchQuery}"</strong>.
           </p>
           <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
-            <button class="btn btn-ai" onclick="window.toggleAiChat()">🤖 Consultar al Asistente de IA</button>
+            <button class="btn btn-ai" onclick="window.toggleAiChat()">🤖 Consultarle de nuevo a Rolfi</button>
             <button class="btn btn-outline" onclick="window.resetFilters()">Ver todos los rubros</button>
           </div>
         </div>
@@ -508,12 +505,12 @@ function renderFreeCard(l) {
   `;
 }
 
-// ---------------- WIDGET DE ASISTENTE DE IA INTELIGENTE ---------------- //
+// ---------------- WIDGET DE ASISTENTE ROLFI ---------------- //
 function renderAiAssistantWidget() {
   if (!state.showAiChat) {
     return `
       <button class="ai-floating-trigger" onclick="window.toggleAiChat()">
-        🤖 Asistente IA Chascomús
+        🤖 Pregúntale a Rolfi
       </button>
     `;
   }
@@ -521,7 +518,7 @@ function renderAiAssistantWidget() {
   return `
     <div class="ai-chat-window">
       <div class="ai-chat-header">
-        <h4>🤖 Asistente Virtual Chascomús</h4>
+        <h4>🤖 Rolfi — Asistente Virtual</h4>
         <button style="background:transparent; border:none; color:white; font-size:18px; cursor:pointer;" onclick="window.toggleAiChat()">✕</button>
       </div>
 
@@ -534,7 +531,7 @@ function renderAiAssistantWidget() {
       </div>
 
       <div style="padding: 6px 12px; background: #f1f5f9; border-top: 1px solid var(--border);">
-        <div style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 4px; font-weight: 600;">Sugerencias rápidas:</div>
+        <div style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 4px; font-weight: 600;">Sugerencias para Rolfi:</div>
         <div class="ai-quick-prompts">
           <button class="ai-prompt-chip" onclick="window.askAiPrompt('¿Qué farmacia está de guardia hoy?')">💊 Farmacia de guardia</button>
           <button class="ai-prompt-chip" onclick="window.askAiPrompt('Necesito un plomero o gasista')">🔧 Plomero o Gasista</button>
@@ -547,7 +544,7 @@ function renderAiAssistantWidget() {
         <input 
           type="text" 
           id="aiInput" 
-          placeholder="Escribí lo que buscás..." 
+          placeholder="Pregúntale lo que quieras a Rolfi..." 
           value="${state.aiInputText}"
           oninput="state.aiInputText = this.value"
         />
@@ -556,6 +553,16 @@ function renderAiAssistantWidget() {
     </div>
   `;
 }
+
+window.handleHeroAiSubmit = function(e) {
+  e.preventDefault();
+  const inputVal = document.getElementById('heroAiInput').value;
+  if (!inputVal.trim()) return;
+
+  state.aiInputText = inputVal;
+  state.showAiChat = true;
+  window.handleAiMessageSubmit(e);
+};
 
 window.toggleAiChat = function() {
   state.showAiChat = !state.showAiChat;
@@ -578,11 +585,9 @@ window.handleAiMessageSubmit = function(e) {
   const text = state.aiInputText.trim();
   if (!text) return;
 
-  // Agregar mensaje del usuario
   state.aiMessages.push({ sender: 'user', text });
   state.aiInputText = '';
 
-  // Procesamiento Inteligente con el motor IA de Chascomús
   const textLower = text.toLowerCase();
   let botReply = '';
 
@@ -590,30 +595,30 @@ window.handleAiMessageSubmit = function(e) {
     const dutyInfo = getPharmDutyDateInfo();
     const deTurno = state.farmacias.filter(f => isPharmDeTurnoToday(f));
     if (deTurno.length > 0) {
-      botReply = `❇️ Hoy ${dutyInfo.dayName} ${dutyInfo.shortDate} la farmacia de guardia activa es **${deTurno[0].nombre}** en ${deTurno[0].direccion}. ¡Podés ver los datos completos arriba en el mapa!`;
+      botReply = `❇️ ¡Hola! Hoy ${dutyInfo.dayName} ${dutyInfo.shortDate} la farmacia de guardia activa es **${deTurno[0].nombre}** en ${deTurno[0].direccion}. Podés ver su mapa de llegada arriba de todo.`;
     } else {
       botReply = `💊 Podés consultar el listado completo de farmacias en Chascomús arriba de todo en la pantalla principal.`;
     }
     state.searchQuery = 'farmacia';
   } else if (textLower.includes('plomero') || textLower.includes('agua') || textLower.includes('canilla') || textLower.includes('caño') || textLower.includes('gas')) {
-    botReply = `🚰 ¡Encontré profesionales de Plomería & Gas Matriculado en Chascomús! Filtré la lista abajo para que puedas llamar o enviar un WhatsApp de inmediato.`;
+    botReply = `🚰 ¡Con gusto! Encontré profesionales de Plomería & Gas Matriculado en Chascomús. Filtré la lista abajo para que puedas llamarlos o enviarles un WhatsApp.`;
     state.searchQuery = 'plomeria';
   } else if (textLower.includes('electricista') || textLower.includes('luz') || textLower.includes('cable') || textLower.includes('térmica')) {
-    botReply = `⚡ Te filtré los electricistas y especialistas en iluminación en Chascomús. Mirá las opciones listadas abajo.`;
+    botReply = `⚡ ¡Excelente! Te filtré los electricistas y especialistas en iluminación en Chascomús listados abajo.`;
     state.searchQuery = 'electricidad';
   } else if (textLower.includes('pizza') || textLower.includes('comida') || textLower.includes('hamburguesa') || textLower.includes('delivery')) {
-    botReply = `🍕 ¡Qué rico! Filtré los restaurantes, pizzerías y rotiserías de Chascomús con envío a domicilio.`;
+    botReply = `🍕 ¡Mmmm qué rico! Te filtré las pizzerías y opciones de gastronomía en Chascomús con envío a domicilio.`;
     state.searchQuery = 'gastronomia';
   } else if (textLower.includes('remis') || textLower.includes('viaje') || textLower.includes('taxi') || textLower.includes('traslado')) {
-    botReply = `🚕 Encontré agencias de remises y traslados listos en Chascomús.`;
+    botReply = `🚕 Te encontré las mejores opciones de remises y traslados en Chascomús.`;
     state.searchQuery = 'remises';
   } else {
     const results = performSmartSearch(text);
     if (results.length > 0) {
-      botReply = `🔍 ¡Encontré ${results.length} opciones en Chascomús para "${text}"! Filtré los resultados abajo.`;
+      botReply = `🔍 ¡Encontré ${results.length} opciones en Chascomús para "${text}"! Filtré los resultados abajo para vos.`;
       state.searchQuery = text;
     } else {
-      botReply = `🤔 No encontré un comercio exacto para "${text}", pero te recomiendo revisar nuestras categorías o comunicarte directamente por WhatsApp con la administración de la guía.`;
+      botReply = `🤔 No encontré un comercio exacto para "${text}", pero te sugiero consultar nuestras categorías o contactar al administrador por WhatsApp.`;
     }
   }
 
@@ -624,7 +629,6 @@ window.handleAiMessageSubmit = function(e) {
     const scroll = document.getElementById('aiChatScroll');
     if (scroll) scroll.scrollTop = scroll.scrollHeight;
     
-    // Scroll suave hacia los resultados
     const listingsSection = document.getElementById('listings-section');
     if (listingsSection) {
       listingsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -815,7 +819,7 @@ function renderAdminPendingTab() {
               <td>${s.rubroNombre}</td>
               <td>
                 <span style="font-weight: 700; color: ${s.planDeseado === 'oro' ? 'var(--accent-gold)' : s.planDeseado === 'plata' ? 'var(--primary)' : 'var(--text-muted)'}">
-                  ${s.planDeseado === 'oro' ? '⭐ ORO VIP' : s.planDeseado === 'plata' ? '🔹 PLATA' : 'GRATUITO'}
+                  ${s.planDeseado === 'oro' ? '⭐ ORO VIP' : s.planDeseado === 'plata' ? '🔹 PLATA' : 'GRATUITION'}
                 </span>
               </td>
               <td>📞 ${s.telefono}</td>
