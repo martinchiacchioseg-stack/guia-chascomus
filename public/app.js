@@ -1,5 +1,5 @@
 // ==========================================================================
-// GUÍA CHASCOMÚS - CLIENT APPLICATION LOGIC (v8.0 - GREEN PHARMACY CROSS DE GUARDIA)
+// GUÍA CHASCOMÚS - CLIENT APPLICATION LOGIC (v10.0 - SMART AI SEARCH ASSISTANT)
 // Branding: Desarrollado por rolϕ
 // WhatsApp: 5492241527357
 // ==========================================================================
@@ -24,17 +24,69 @@ const state = {
   adminToken: null,
   adminTab: 'pending',
   pendingSubmissions: [],
-  whatsappAdmin: '5492241527357'
+  whatsappAdmin: '5492241527357',
+  
+  // AI Assistant State
+  showAiChat: false,
+  aiInputText: '',
+  aiMessages: [
+    {
+      sender: 'bot',
+      text: '¡Hola! 👋 Soy el Asistente Virtual de Guía Chascomús. ¿En qué te puedo ayudar hoy? Escribime lo que buscás (ej: "necesito arreglar una canilla", "farmacia de turno", "dónde comer pizza") y te encuentro la mejor opción.'
+    }
+  ]
 };
 
 const DIAS_SEMANA = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+
+// Diccionario de Inteligencia para expansión semántica y sinónimos
+const SYNONYMS_MAP = {
+  agua: ['plomeria', 'plomero', 'canilla', 'caño', 'humedad', 'tanque', 'termo', 'bomba', 'perdida'],
+  gas: ['plomeria', 'gasista', 'garrafa', 'cocina', 'estufa', 'calefaccion'],
+  luz: ['electricidad', 'electricista', 'térmica', 'cable', 'enchufe', 'corto', 'lámpara', 'luces'],
+  comida: ['gastronomia', 'pizzeria', 'pizza', 'empanada', 'hamburguesa', 'resto', 'almuerzo', 'cena', 'delivery', 'comidas', 'rotiseria'],
+  viaje: ['remises', 'remis', 'taxi', 'traslado', 'chofer', 'flete', 'comisionista'],
+  mueble: ['carpinteria', 'carpintero', 'placard', 'madera', 'mesa', 'silla', 'abertura'],
+  pared: ['albanileria', 'albañil', 'reforma', 'cemento', 'ladrillo', 'pintura', 'construccion'],
+  remedio: ['farmacias', 'farmacia', 'medicamento', 'receta', 'guardia', 'salud', 'remedios'],
+  perro: ['veterinarias', 'veterinaria', 'mascota', 'gato', 'vacuna', 'alimento'],
+  casa: ['inmobiliarias', 'alquiler', 'departamento', 'terreno', 'venta', 'propiedad', 'cabañas', 'hotel', 'turismo']
+};
+
+function performSmartSearch(query) {
+  if (!query || !query.trim()) return state.listings;
+  
+  const q = query.toLowerCase().trim();
+  const words = q.split(/\s+/);
+
+  return state.listings.filter(l => {
+    const textToMatch = `${l.nombre} ${l.descripcion} ${l.rubroNombre} ${l.direccion}`.toLowerCase();
+    
+    // Coincidencia directa
+    if (textToMatch.includes(q)) return true;
+    
+    // Coincidencia palabra por palabra
+    const matchesWord = words.some(w => w.length > 2 && textToMatch.includes(w));
+    if (matchesWord) return true;
+
+    // Coincidencia por conceptos y sinónimos inteligentes
+    for (const [key, synonyms] of Object.entries(SYNONYMS_MAP)) {
+      const userAskedConcept = words.some(w => w.includes(key) || synonyms.includes(w));
+      if (userAskedConcept) {
+        const listingMatchesConcept = textToMatch.includes(key) || synonyms.some(s => textToMatch.includes(s));
+        if (listingMatchesConcept) return true;
+      }
+    }
+
+    return false;
+  });
+}
 
 function getPharmDutyDateInfo() {
   const now = new Date();
   const hours = now.getHours();
 
   let targetDate = new Date(now);
-  // Si son antes de las 08:00 AM, el turno pertenece al día anterior
   if (hours < 8) {
     targetDate.setDate(targetDate.getDate() - 1);
   }
@@ -50,9 +102,9 @@ function getPharmDutyDateInfo() {
     dayNum,
     monthNum,
     yearNum,
-    fullDate: `${d}/${m}/${yearNum}`, // "13/08/2026"
-    shortDate: `${d}/${m}`,          // "13/08"
-    altShortDate: `${dayNum}/${monthNum}`, // "13/8"
+    fullDate: `${d}/${m}/${yearNum}`,
+    shortDate: `${d}/${m}`,
+    altShortDate: `${dayNum}/${monthNum}`,
     dayName: DIAS_SEMANA[targetDate.getDay()]
   };
 }
@@ -62,18 +114,15 @@ function isPharmDeTurnoToday(f) {
 
   const dutyInfo = getPharmDutyDateInfo();
 
-  // 1. Verificar fechas específicas del mes (ej: "13/08", "13/8", "13", "13-08")
   if (f.fechasTurno && Array.isArray(f.fechasTurno) && f.fechasTurno.length > 0) {
     const isMatch = f.fechasTurno.some(raw => {
       if (!raw) return false;
       const str = String(raw).trim();
       
-      // Si escribió solo el número de día, ej: "13"
       if (/^\d{1,2}$/.test(str)) {
         return parseInt(str, 10) === dutyInfo.dayNum;
       }
       
-      // Extraer números de día y mes
       const parts = str.split(/[\/\.\-]/).map(p => parseInt(p.trim(), 10)).filter(n => !isNaN(n));
       if (parts.length >= 2) {
         const pDay = parts[0];
@@ -93,7 +142,6 @@ function isPharmDeTurnoToday(f) {
     if (isMatch) return true;
   }
 
-  // 2. Verificar por día de semana (ej: "Lunes", "Miércoles")
   if (f.diasTurno && Array.isArray(f.diasTurno) && f.diasTurno.length > 0) {
     const hoyNombre = dutyInfo.dayName.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
     return f.diasTurno.some(d => {
@@ -186,6 +234,8 @@ function renderApp() {
 
     ${renderFooter()}
     
+    ${renderAiAssistantWidget()}
+
     ${state.showAdModal ? renderAdModal() : ''}
     ${state.showSubmitModal ? renderSubmitModal() : ''}
     ${state.showAdminModal ? renderAdminModal() : ''}
@@ -209,6 +259,9 @@ function renderNavbar() {
         </div>
         
         <div class="nav-actions">
+          <button class="btn btn-ai" onclick="window.toggleAiChat()">
+            🤖 Asistente IA
+          </button>
           <button class="btn btn-whatsapp" onclick="window.openWhatsAppAdmin()">
             💬 Publicá por WhatsApp
           </button>
@@ -228,17 +281,17 @@ function renderHero() {
       <div class="hero-content">
         <div class="hero-badge">📍 Chascomús, Provincia de Buenos Aires</div>
         <h2>Encontrá todo en Chascomús</h2>
-        <p>Farmacias de turno, profesionales, comercios y servicios al instante.</p>
+        <p>Buscá lo que necesitás en lenguaje natural o consultale a nuestro Asistente de IA.</p>
         
         <div class="search-box">
           <input 
             type="text" 
             id="searchInput" 
-            placeholder="¿Qué estás buscando? (Ej: Plomero, Remis, Pizzería, Ferretería...)"
+            placeholder="Ej: 'se me rompió una canilla', 'farmacia de turno', 'quiero pedir pizza'..."
             value="${state.searchQuery}"
             oninput="window.onSearchChange(event)"
           />
-          <button class="btn btn-primary">🔍 Buscar</button>
+          <button class="btn btn-primary">🔍 Buscar con IA</button>
         </div>
       </div>
     </section>
@@ -252,35 +305,36 @@ function renderPharmCard(f, isDeTurno) {
 
   return `
     <div class="pharmacy-card" onclick="window.checkPharmacyPopup('${f.id}')" style="cursor: pointer; ${isDeTurno ? 'border-color: #10b981; background: linear-gradient(180deg, #f0fdf4 0%, #ffffff 100%);' : 'border-color: var(--border);'}">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-        ${isDeTurno ? `
-          <div class="pharmacy-badge-guardia">❇️ DE GUARDIA</div>
-        ` : `
-          <div class="pharmacy-badge-regular">⚪ ATENCIÓN REGULAR</div>
-        `}
-        ${hasAd ? '<span style="font-size: 0.75rem; background: var(--accent-gold); color: white; padding: 2px 8px; border-radius: 99px; font-weight: 700;">📢 PROMO</span>' : ''}
-      </div>
-      
-      <h4>${f.nombre}</h4>
-      <div class="pharmacy-info">
-        <span>📍 ${f.direccion}</span>
-        ${f.telefono ? `<span>📞 Tel: <strong>${f.telefono}</strong></span>` : ''}
-        <span>⏰ ${f.horario || 'Turno 24 hs (08:00 a 08:00 hs)'}</span>
+      <div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+          ${isDeTurno ? `
+            <div class="pharmacy-badge-guardia">❇️ DE GUARDIA</div>
+          ` : `
+            <div class="pharmacy-badge-regular">⚪ REGULAR</div>
+          `}
+          ${hasAd ? '<span style="font-size: 0.7rem; background: var(--accent-gold); color: white; padding: 2px 6px; border-radius: 99px; font-weight: 700;">📢 PROMO</span>' : ''}
+        </div>
         
-        ${f.fechasTurno && f.fechasTurno.length > 0 ? `
-          <div style="margin-top: 6px;">
-            <strong style="font-size: 0.82rem; color: var(--text-main);">Fechas de Guardia en el Mes:</strong><br>
-            ${f.fechasTurno.map(fecha => {
-              const isToday = isPharmDeTurnoToday(f) && (fecha.includes(dutyInfo.shortDate) || fecha.includes(dutyInfo.altShortDate));
-              return `<span class="day-badge" style="${isToday ? 'background: #10b981; color: white; font-weight: 800;' : ''}">${fecha}</span>`;
-            }).join('')}
-          </div>
-        ` : ''}
+        <h4>${f.nombre}</h4>
+        <div class="pharmacy-info">
+          <span>📍 ${f.direccion}</span>
+          ${f.telefono ? `<span>📞 <strong>${f.telefono}</strong></span>` : ''}
+          
+          ${f.fechasTurno && f.fechasTurno.length > 0 ? `
+            <div style="margin-top: 4px;">
+              <strong style="font-size: 0.75rem; color: var(--text-main);">Fechas:</strong>
+              ${f.fechasTurno.map(fecha => {
+                const isToday = isPharmDeTurnoToday(f) && (fecha.includes(dutyInfo.shortDate) || fecha.includes(dutyInfo.altShortDate));
+                return `<span class="day-badge" style="${isToday ? 'background: #10b981; color: white; font-weight: 800;' : ''}">${fecha}</span>`;
+              }).join('')}
+            </div>
+          ` : ''}
+        </div>
       </div>
       
       <div class="pharmacy-actions">
         ${f.telefono ? `<a href="tel:${f.telefono}" class="btn btn-outline" style="flex:1;" onclick="event.stopPropagation(); window.checkPharmacyPopup('${f.id}');">📞 Llamar</a>` : ''}
-        <a href="${mapLink}" target="_blank" class="btn btn-primary" style="${isDeTurno ? 'background: linear-gradient(135deg, #10b981, #059669);' : ''} flex:1;" onclick="event.stopPropagation(); window.checkPharmacyPopup('${f.id}');">📍 Cómo llegar</a>
+        <a href="${mapLink}" target="_blank" class="btn btn-primary" style="${isDeTurno ? 'background: linear-gradient(135deg, #10b981, #059669);' : ''} flex:1;" onclick="event.stopPropagation(); window.checkPharmacyPopup('${f.id}');">📍 Mapa</a>
       </div>
     </div>
   `;
@@ -289,12 +343,12 @@ function renderPharmCard(f, isDeTurno) {
 function renderFarmaciasSection() {
   if (!state.farmacias || state.farmacias.length === 0) {
     return `
-      <section style="margin-bottom: 36px;">
+      <section style="margin-bottom: 28px;">
         <div class="section-title">
           <h3>❇️ Farmacias de Guardia en Chascomús</h3>
         </div>
-        <div style="background: white; padding: 24px; border-radius: var(--radius-md); border: 1px solid var(--border); text-align: center;">
-          <p style="color: var(--text-muted);">No hay farmacias cargadas en el sistema. Podés agregarlas desde el Panel de Administración.</p>
+        <div style="background: white; padding: 18px; border-radius: var(--radius-md); border: 1px solid var(--border); text-align: center;">
+          <p style="color: var(--text-muted); font-size: 0.9rem;">No hay farmacias cargadas en el sistema. Podés agregarlas desde el Panel de Administración.</p>
         </div>
       </section>
     `;
@@ -305,10 +359,10 @@ function renderFarmaciasSection() {
   const regulares = state.farmacias.filter(f => !isPharmDeTurnoToday(f));
 
   return `
-    <section style="margin-bottom: 36px;">
+    <section style="margin-bottom: 28px;">
       <div class="section-title">
         <h3>❇️ Farmacias de Guardia & Atención en Chascomús</h3>
-        <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">Hoy ${dutyInfo.dayName} ${dutyInfo.shortDate} — Guardia 08:00 a 08:00 hs</span>
+        <span style="font-size: 0.8rem; color: var(--text-muted); font-weight: 500;">Hoy ${dutyInfo.dayName} ${dutyInfo.shortDate} — Guardia 08:00 a 08:00 hs</span>
       </div>
       
       <div class="pharmacy-card-grid">
@@ -350,21 +404,11 @@ function renderRubrosSection() {
 }
 
 function renderListingsSection() {
-  let filtered = state.listings;
+  let filtered = performSmartSearch(state.searchQuery);
   let rubroObj = state.rubros.find(r => r.id === state.selectedRubro);
 
   if (state.selectedRubro !== 'todos') {
     filtered = filtered.filter(l => l.rubroId === state.selectedRubro);
-  }
-
-  if (state.searchQuery.trim() !== '') {
-    const q = state.searchQuery.toLowerCase().trim();
-    filtered = filtered.filter(l => 
-      l.nombre.toLowerCase().includes(q) ||
-      l.descripcion.toLowerCase().includes(q) ||
-      l.rubroNombre.toLowerCase().includes(q) ||
-      l.direccion.toLowerCase().includes(q)
-    );
   }
 
   const tituloSeccion = state.selectedRubro === 'todos' 
@@ -375,9 +419,9 @@ function renderListingsSection() {
     <section id="listings-section" style="scroll-margin-top: 80px;">
       <div class="section-title" style="display: flex; justify-content: space-between; align-items: center;">
         <h3>${tituloSeccion}</h3>
-        ${state.selectedRubro !== 'todos' ? `
+        ${(state.selectedRubro !== 'todos' || state.searchQuery) ? `
           <button class="btn btn-outline" style="font-size: 0.82rem; padding: 6px 14px;" onclick="window.resetFilters()">
-            ✕ Ver Todos los Rubros
+            ✕ Limpiar Filtros
           </button>
         ` : ''}
       </div>
@@ -385,10 +429,10 @@ function renderListingsSection() {
       ${filtered.length === 0 ? `
         <div style="text-align: center; padding: 50px 20px; background: white; border-radius: var(--radius-md); border: 1px solid var(--border); box-shadow: var(--shadow-sm);">
           <p style="font-size: 1.2rem; color: var(--text-muted); margin-bottom: 12px;">
-            ${state.selectedRubro !== 'todos' ? `Aún no hay publicaciones cargadas en <strong>${rubroObj ? rubroObj.nombre : 'esta categoría'}</strong>.` : 'No se encontraron publicaciones para tu búsqueda.'}
+            No se encontraron publicaciones para <strong>"${state.searchQuery}"</strong>.
           </p>
           <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
-            <button class="btn btn-primary" onclick="window.openSubmitModal()">➕ Sé el primero en publicar gratis</button>
+            <button class="btn btn-ai" onclick="window.toggleAiChat()">🤖 Consultar al Asistente de IA</button>
             <button class="btn btn-outline" onclick="window.resetFilters()">Ver todos los rubros</button>
           </div>
         </div>
@@ -463,6 +507,130 @@ function renderFreeCard(l) {
     </div>
   `;
 }
+
+// ---------------- WIDGET DE ASISTENTE DE IA INTELIGENTE ---------------- //
+function renderAiAssistantWidget() {
+  if (!state.showAiChat) {
+    return `
+      <button class="ai-floating-trigger" onclick="window.toggleAiChat()">
+        🤖 Asistente IA Chascomús
+      </button>
+    `;
+  }
+
+  return `
+    <div class="ai-chat-window">
+      <div class="ai-chat-header">
+        <h4>🤖 Asistente Virtual Chascomús</h4>
+        <button style="background:transparent; border:none; color:white; font-size:18px; cursor:pointer;" onclick="window.toggleAiChat()">✕</button>
+      </div>
+
+      <div class="ai-chat-messages" id="aiChatScroll">
+        ${state.aiMessages.map(msg => `
+          <div class="ai-msg ${msg.sender === 'user' ? 'ai-msg-user' : 'ai-msg-bot'}">
+            ${msg.text}
+          </div>
+        `).join('')}
+      </div>
+
+      <div style="padding: 6px 12px; background: #f1f5f9; border-top: 1px solid var(--border);">
+        <div style="font-size: 0.72rem; color: var(--text-muted); margin-bottom: 4px; font-weight: 600;">Sugerencias rápidas:</div>
+        <div class="ai-quick-prompts">
+          <button class="ai-prompt-chip" onclick="window.askAiPrompt('¿Qué farmacia está de guardia hoy?')">💊 Farmacia de guardia</button>
+          <button class="ai-prompt-chip" onclick="window.askAiPrompt('Necesito un plomero o gasista')">🔧 Plomero o Gasista</button>
+          <button class="ai-prompt-chip" onclick="window.askAiPrompt('Quiero pedir pizza o comida')">🍕 Comida a domicilio</button>
+          <button class="ai-prompt-chip" onclick="window.askAiPrompt('Pedir un remis')">🚕 Remis</button>
+        </div>
+      </div>
+
+      <form onsubmit="window.handleAiMessageSubmit(event)" class="ai-chat-input-area">
+        <input 
+          type="text" 
+          id="aiInput" 
+          placeholder="Escribí lo que buscás..." 
+          value="${state.aiInputText}"
+          oninput="state.aiInputText = this.value"
+        />
+        <button type="submit">➔</button>
+      </form>
+    </div>
+  `;
+}
+
+window.toggleAiChat = function() {
+  state.showAiChat = !state.showAiChat;
+  renderApp();
+  if (state.showAiChat) {
+    setTimeout(() => {
+      const scroll = document.getElementById('aiChatScroll');
+      if (scroll) scroll.scrollTop = scroll.scrollHeight;
+    }, 50);
+  }
+};
+
+window.askAiPrompt = function(promptText) {
+  state.aiInputText = promptText;
+  window.handleAiMessageSubmit(new Event('submit'));
+};
+
+window.handleAiMessageSubmit = function(e) {
+  if (e) e.preventDefault();
+  const text = state.aiInputText.trim();
+  if (!text) return;
+
+  // Agregar mensaje del usuario
+  state.aiMessages.push({ sender: 'user', text });
+  state.aiInputText = '';
+
+  // Procesamiento Inteligente con el motor IA de Chascomús
+  const textLower = text.toLowerCase();
+  let botReply = '';
+
+  if (textLower.includes('farmacia') || textLower.includes('guardia') || textLower.includes('remedio') || textLower.includes('medicamento')) {
+    const dutyInfo = getPharmDutyDateInfo();
+    const deTurno = state.farmacias.filter(f => isPharmDeTurnoToday(f));
+    if (deTurno.length > 0) {
+      botReply = `❇️ Hoy ${dutyInfo.dayName} ${dutyInfo.shortDate} la farmacia de guardia activa es **${deTurno[0].nombre}** en ${deTurno[0].direccion}. ¡Podés ver los datos completos arriba en el mapa!`;
+    } else {
+      botReply = `💊 Podés consultar el listado completo de farmacias en Chascomús arriba de todo en la pantalla principal.`;
+    }
+    state.searchQuery = 'farmacia';
+  } else if (textLower.includes('plomero') || textLower.includes('agua') || textLower.includes('canilla') || textLower.includes('caño') || textLower.includes('gas')) {
+    botReply = `🚰 ¡Encontré profesionales de Plomería & Gas Matriculado en Chascomús! Filtré la lista abajo para que puedas llamar o enviar un WhatsApp de inmediato.`;
+    state.searchQuery = 'plomeria';
+  } else if (textLower.includes('electricista') || textLower.includes('luz') || textLower.includes('cable') || textLower.includes('térmica')) {
+    botReply = `⚡ Te filtré los electricistas y especialistas en iluminación en Chascomús. Mirá las opciones listadas abajo.`;
+    state.searchQuery = 'electricidad';
+  } else if (textLower.includes('pizza') || textLower.includes('comida') || textLower.includes('hamburguesa') || textLower.includes('delivery')) {
+    botReply = `🍕 ¡Qué rico! Filtré los restaurantes, pizzerías y rotiserías de Chascomús con envío a domicilio.`;
+    state.searchQuery = 'gastronomia';
+  } else if (textLower.includes('remis') || textLower.includes('viaje') || textLower.includes('taxi') || textLower.includes('traslado')) {
+    botReply = `🚕 Encontré agencias de remises y traslados listos en Chascomús.`;
+    state.searchQuery = 'remises';
+  } else {
+    const results = performSmartSearch(text);
+    if (results.length > 0) {
+      botReply = `🔍 ¡Encontré ${results.length} opciones en Chascomús para "${text}"! Filtré los resultados abajo.`;
+      state.searchQuery = text;
+    } else {
+      botReply = `🤔 No encontré un comercio exacto para "${text}", pero te recomiendo revisar nuestras categorías o comunicarte directamente por WhatsApp con la administración de la guía.`;
+    }
+  }
+
+  state.aiMessages.push({ sender: 'bot', text: botReply });
+  renderApp();
+
+  setTimeout(() => {
+    const scroll = document.getElementById('aiChatScroll');
+    if (scroll) scroll.scrollTop = scroll.scrollHeight;
+    
+    // Scroll suave hacia los resultados
+    const listingsSection = document.getElementById('listings-section');
+    if (listingsSection) {
+      listingsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, 100);
+};
 
 function renderAdModal() {
   const ad = state.activePopup;
@@ -1175,6 +1343,7 @@ function renderFooter() {
 
 window.filterRubro = function(rubroId) {
   state.selectedRubro = rubroId;
+  state.searchQuery = '';
   renderApp();
 
   if (rubroId !== 'todos') {
