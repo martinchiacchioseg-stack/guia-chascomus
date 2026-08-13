@@ -1,5 +1,5 @@
 // ==========================================================================
-// GUÍA CHASCOMÚS - CLIENT APPLICATION LOGIC (v6.0 - Duty by Month Dates & Optional Phone)
+// GUÍA CHASCOMÚS - CLIENT APPLICATION LOGIC (v8.0 - GREEN PHARMACY CROSS DE GUARDIA)
 // Branding: Desarrollado por rolϕ
 // WhatsApp: 5492241527357
 // ==========================================================================
@@ -39,13 +39,20 @@ function getPharmDutyDateInfo() {
     targetDate.setDate(targetDate.getDate() - 1);
   }
 
-  const d = String(targetDate.getDate()).padStart(2, '0');
-  const m = String(targetDate.getMonth() + 1).padStart(2, '0');
-  const y = targetDate.getFullYear();
+  const dayNum = targetDate.getDate();
+  const monthNum = targetDate.getMonth() + 1;
+  const yearNum = targetDate.getFullYear();
+
+  const d = String(dayNum).padStart(2, '0');
+  const m = String(monthNum).padStart(2, '0');
 
   return {
-    fullDate: `${d}/${m}/${y}`, // "13/08/2026"
-    shortDate: `${d}/${m}`,     // "13/08"
+    dayNum,
+    monthNum,
+    yearNum,
+    fullDate: `${d}/${m}/${yearNum}`, // "13/08/2026"
+    shortDate: `${d}/${m}`,          // "13/08"
+    altShortDate: `${dayNum}/${monthNum}`, // "13/8"
     dayName: DIAS_SEMANA[targetDate.getDay()]
   };
 }
@@ -55,12 +62,34 @@ function isPharmDeTurnoToday(f) {
 
   const dutyInfo = getPharmDutyDateInfo();
 
-  // 1. Verificar fechas específicas del mes (ej: "10/08", "13/08", "25/08")
+  // 1. Verificar fechas específicas del mes (ej: "13/08", "13/8", "13", "13-08")
   if (f.fechasTurno && Array.isArray(f.fechasTurno) && f.fechasTurno.length > 0) {
-    const isMatch = f.fechasTurno.some(fechaStr => {
-      const clean = String(fechaStr).trim().replace(/-/g, '/');
-      return clean === dutyInfo.fullDate || clean === dutyInfo.shortDate || clean.startsWith(dutyInfo.shortDate);
+    const isMatch = f.fechasTurno.some(raw => {
+      if (!raw) return false;
+      const str = String(raw).trim();
+      
+      // Si escribió solo el número de día, ej: "13"
+      if (/^\d{1,2}$/.test(str)) {
+        return parseInt(str, 10) === dutyInfo.dayNum;
+      }
+      
+      // Extraer números de día y mes
+      const parts = str.split(/[\/\.\-]/).map(p => parseInt(p.trim(), 10)).filter(n => !isNaN(n));
+      if (parts.length >= 2) {
+        const pDay = parts[0];
+        const pMonth = parts[1];
+        return pDay === dutyInfo.dayNum && pMonth === dutyInfo.monthNum;
+      }
+
+      return (
+        str === dutyInfo.fullDate ||
+        str === dutyInfo.shortDate ||
+        str === dutyInfo.altShortDate ||
+        str.includes(dutyInfo.shortDate) ||
+        str.includes(dutyInfo.altShortDate)
+      );
     });
+
     if (isMatch) return true;
   }
 
@@ -216,46 +245,75 @@ function renderHero() {
   `;
 }
 
+function renderPharmCard(f, isDeTurno) {
+  const dutyInfo = getPharmDutyDateInfo();
+  const hasAd = state.popups.some(p => (p.ubicacion === 'pharmacy_' + f.id || p.ubicacion === f.id) && p.activo);
+  const mapLink = f.mapsUrl || `https://maps.google.com/?q=${encodeURIComponent(f.nombre)}+Chascomus`;
+
+  return `
+    <div class="pharmacy-card" onclick="window.checkPharmacyPopup('${f.id}')" style="cursor: pointer; ${isDeTurno ? 'border-color: #10b981; background: linear-gradient(180deg, #f0fdf4 0%, #ffffff 100%);' : 'border-color: var(--border);'}">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        ${isDeTurno ? `
+          <div class="pharmacy-badge-guardia">❇️ DE GUARDIA</div>
+        ` : `
+          <div class="pharmacy-badge-regular">⚪ ATENCIÓN REGULAR</div>
+        `}
+        ${hasAd ? '<span style="font-size: 0.75rem; background: var(--accent-gold); color: white; padding: 2px 8px; border-radius: 99px; font-weight: 700;">📢 PROMO</span>' : ''}
+      </div>
+      
+      <h4>${f.nombre}</h4>
+      <div class="pharmacy-info">
+        <span>📍 ${f.direccion}</span>
+        ${f.telefono ? `<span>📞 Tel: <strong>${f.telefono}</strong></span>` : ''}
+        <span>⏰ ${f.horario || 'Turno 24 hs (08:00 a 08:00 hs)'}</span>
+        
+        ${f.fechasTurno && f.fechasTurno.length > 0 ? `
+          <div style="margin-top: 6px;">
+            <strong style="font-size: 0.82rem; color: var(--text-main);">Fechas de Guardia en el Mes:</strong><br>
+            ${f.fechasTurno.map(fecha => {
+              const isToday = isPharmDeTurnoToday(f) && (fecha.includes(dutyInfo.shortDate) || fecha.includes(dutyInfo.altShortDate));
+              return `<span class="day-badge" style="${isToday ? 'background: #10b981; color: white; font-weight: 800;' : ''}">${fecha}</span>`;
+            }).join('')}
+          </div>
+        ` : ''}
+      </div>
+      
+      <div class="pharmacy-actions">
+        ${f.telefono ? `<a href="tel:${f.telefono}" class="btn btn-outline" style="flex:1;" onclick="event.stopPropagation(); window.checkPharmacyPopup('${f.id}');">📞 Llamar</a>` : ''}
+        <a href="${mapLink}" target="_blank" class="btn btn-primary" style="${isDeTurno ? 'background: linear-gradient(135deg, #10b981, #059669);' : ''} flex:1;" onclick="event.stopPropagation(); window.checkPharmacyPopup('${f.id}');">📍 Cómo llegar</a>
+      </div>
+    </div>
+  `;
+}
+
 function renderFarmaciasSection() {
+  if (!state.farmacias || state.farmacias.length === 0) {
+    return `
+      <section style="margin-bottom: 36px;">
+        <div class="section-title">
+          <h3>❇️ Farmacias de Guardia en Chascomús</h3>
+        </div>
+        <div style="background: white; padding: 24px; border-radius: var(--radius-md); border: 1px solid var(--border); text-align: center;">
+          <p style="color: var(--text-muted);">No hay farmacias cargadas en el sistema. Podés agregarlas desde el Panel de Administración.</p>
+        </div>
+      </section>
+    `;
+  }
+
   const dutyInfo = getPharmDutyDateInfo();
   const deTurno = state.farmacias.filter(f => isPharmDeTurnoToday(f));
-  if (deTurno.length === 0) return '';
+  const regulares = state.farmacias.filter(f => !isPharmDeTurnoToday(f));
 
   return `
     <section style="margin-bottom: 36px;">
       <div class="section-title">
-        <h3>💊 Farmacias de Turno HOY (${dutyInfo.dayName} ${dutyInfo.shortDate})</h3>
-        <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">Guardia 24hs: 08:00 AM a 08:00 AM del día siguiente</span>
+        <h3>❇️ Farmacias de Guardia & Atención en Chascomús</h3>
+        <span style="font-size: 0.85rem; color: var(--text-muted); font-weight: 500;">Hoy ${dutyInfo.dayName} ${dutyInfo.shortDate} — Guardia 08:00 a 08:00 hs</span>
       </div>
       
       <div class="pharmacy-card-grid">
-        ${deTurno.map(f => {
-          const hasAd = state.popups.some(p => (p.ubicacion === 'pharmacy_' + f.id || p.ubicacion === f.id) && p.activo);
-          return `
-            <div class="pharmacy-card" onclick="window.checkPharmacyPopup('${f.id}')" style="cursor: pointer;">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                <div class="pharmacy-badge">🔴 DE TURNO HOY (${dutyInfo.shortDate})</div>
-                ${hasAd ? '<span style="font-size: 0.75rem; background: var(--accent-gold); color: white; padding: 2px 8px; border-radius: 99px; font-weight: 700;">📢 PROMO DISPONIBLE</span>' : ''}
-              </div>
-              <h4>${f.nombre}</h4>
-              <div class="pharmacy-info">
-                <span>📍 ${f.direccion}</span>
-                ${f.telefono ? `<span>📞 Tel: <strong>${f.telefono}</strong></span>` : ''}
-                <span>⏰ ${f.horario || 'Turno 24 hs (08:00 a 08:00 hs)'}</span>
-                ${f.fechasTurno && f.fechasTurno.length > 0 ? `
-                  <div style="margin-top: 4px;">
-                    <strong>Fechas asignadas en el mes:</strong><br>
-                    ${f.fechasTurno.map(fecha => `<span class="day-badge" style="${fecha.includes(dutyInfo.shortDate) ? 'background: #ef4444; color: white;' : ''}">${fecha}</span>`).join('')}
-                  </div>
-                ` : ''}
-              </div>
-              <div class="pharmacy-actions">
-                ${f.telefono ? `<a href="tel:${f.telefono}" class="btn btn-outline" style="flex:1;" onclick="event.stopPropagation(); window.checkPharmacyPopup('${f.id}');">📞 Llamar</a>` : ''}
-                <a href="${f.mapsUrl || `https://maps.google.com/?q=${encodeURIComponent(f.nombre)}+Chascomus`}" target="_blank" class="btn btn-primary" style="flex:1;" onclick="event.stopPropagation(); window.checkPharmacyPopup('${f.id}');">📍 Cómo llegar</a>
-              </div>
-            </div>
-          `;
-        }).join('')}
+        ${deTurno.map(f => renderPharmCard(f, true)).join('')}
+        ${regulares.map(f => renderPharmCard(f, false)).join('')}
       </div>
     </section>
   `;
@@ -725,17 +783,17 @@ function renderAdminPharmaciesTab() {
                   <td>📍 ${f.direccion}<br>${f.telefono ? '📞 ' + f.telefono : '<small style="color:var(--text-muted);">(Sin teléfono)</small>'}</td>
                   <td>
                     ${fechasStr ? `<div>📅 <strong>Fechas:</strong> ${fechasStr}</div>` : ''}
-                    ${(f.diasTurno || []).map(d => `<span class="day-badge" style="${d === dutyInfo.dayName ? 'background: #ef4444; color: white;' : ''}">${d}</span>`).join('')}
+                    ${(f.diasTurno || []).map(d => `<span class="day-badge" style="${d === dutyInfo.dayName ? 'background: #10b981; color: white;' : ''}">${d}</span>`).join('')}
                     ${!fechasStr && (!f.diasTurno || f.diasTurno.length === 0) ? '<em>Sin fechas asignadas</em>' : ''}
                   </td>
                   <td>
-                    <span style="color: ${deTurnoHoy ? 'green' : 'gray'}; font-weight: 700;">
-                      ${deTurnoHoy ? `🔴 DE TURNO (Hoy ${dutyInfo.shortDate})` : '⚪ REGULAR'}
+                    <span style="color: ${deTurnoHoy ? '#10b981' : 'gray'}; font-weight: 700;">
+                      ${deTurnoHoy ? `❇️ DE GUARDIA (Hoy ${dutyInfo.shortDate})` : '⚪ ATENCIÓN REGULAR'}
                     </span>
                   </td>
                   <td>
                     <button class="btn btn-outline" style="font-size: 0.8rem;" onclick="window.togglePharmacyTurn('${f.id}')">
-                      ${f.deTurno ? 'Quitar Fuerza Turno' : 'Forzar Turno'}
+                      ${f.deTurno ? 'Quitar Fuerza Guardia' : 'Forzar Guardia'}
                     </button>
                     <button class="btn btn-outline" style="font-size: 0.8rem;" onclick="window.openPharmacyFormModal('${f.id}')">✏️ Editar Fechas</button>
                     <button class="btn btn-outline" style="font-size: 0.8rem; color: red;" onclick="window.deletePharmacy('${f.id}')">🗑️ Borrar</button>
@@ -991,9 +1049,9 @@ function renderPharmacyFormModal() {
           </div>
 
           <div class="form-group" style="background: #fdf4ff; border: 1px solid #f5d0fe; padding: 14px; border-radius: var(--radius-md);">
-            <label style="font-weight: 700; color: #86198f;">📅 Fechas Específicas del Mes (Ej: 10/08, 17/08, 24/08, 31/08):</label>
-            <input type="text" id="editPharmFechas" value="${fechasAsignadas}" placeholder="Ej: 10/08, 17/08, 24/08, 31/08" style="margin-top: 6px;" />
-            <small style="color: #701a75; display: block; margin-top: 4px;">Ingresá 3, 4 o todas las fechas separadas por coma. El sistema las activará de 08:00 AM a 08:00 AM del día siguiente.</small>
+            <label style="font-weight: 700; color: #86198f;">📅 Fechas del Mes (Podés poner 1, 2, 3 o las que quieras):</label>
+            <input type="text" id="editPharmFechas" value="${fechasAsignadas}" placeholder="Ej: 13/08 (o 13/08, 20/08, 27/08)" style="margin-top: 6px;" />
+            <small style="color: #701a75; display: block; margin-top: 4px;">Acepta formatos como 13/08, 13/8, 13 o 13/08/2026. Se activará automáticamente con la insignia verde ❇️ DE GUARDIA.</small>
           </div>
 
           <div class="form-group">
@@ -1455,7 +1513,8 @@ window.savePharmacyForm = async function(e) {
     if (res.ok) {
       await loadAppData();
       window.closePharmacyFormModal();
-      alert('¡Farmacia guardada con éxito! El sistema activará el turno de 08:00 AM a 08:00 AM según las fechas o días asignados.');
+      renderApp();
+      alert('¡Farmacia guardada con éxito!');
     }
   } catch (err) {
     alert('Error al guardar farmacia');
