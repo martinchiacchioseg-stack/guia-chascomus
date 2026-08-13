@@ -18,10 +18,11 @@ const state = {
   showListingFormModal: false,
   showPharmacyFormModal: false,
   showPopupFormModal: false,
+  showRubroFormModal: false,
   editingItem: null,
   isAdmin: false,
   adminToken: null,
-  adminTab: 'pending', // 'pending', 'listings', 'pharmacies', 'ads', 'security'
+  adminTab: 'pending',
   pendingSubmissions: [],
   whatsappAdmin: '5492241527357'
 };
@@ -54,7 +55,6 @@ async function loadAppData() {
   }
 }
 
-// Verificar pop-up inicial de portada
 function checkInitialPopup() {
   const mainPopup = state.popups.find(p => p.ubicacion === 'portada' && p.activo);
   if (mainPopup && !sessionStorage.getItem('ad_closed_portada')) {
@@ -64,7 +64,6 @@ function checkInitialPopup() {
   }
 }
 
-// Verificar pop-up específico de categoría
 function checkCategoryPopup(rubroId) {
   const categoryPopup = state.popups.find(p => p.ubicacion === rubroId && p.activo);
   if (categoryPopup && !sessionStorage.getItem(`ad_closed_${rubroId}`)) {
@@ -73,6 +72,16 @@ function checkCategoryPopup(rubroId) {
     renderApp();
   }
 }
+
+window.checkPharmacyPopup = function(pharmacyId) {
+  const targetKey = 'pharmacy_' + pharmacyId;
+  const pharmPopup = state.popups.find(p => (p.ubicacion === targetKey || p.ubicacion === pharmacyId) && p.activo);
+  if (pharmPopup && !sessionStorage.getItem(`ad_closed_${targetKey}`)) {
+    state.activePopup = pharmPopup;
+    state.showAdModal = true;
+    renderApp();
+  }
+};
 
 window.closeAdModal = function() {
   state.showAdModal = false;
@@ -105,6 +114,7 @@ function renderApp() {
     ${state.showListingFormModal ? renderListingFormModal() : ''}
     ${state.showPharmacyFormModal ? renderPharmacyFormModal() : ''}
     ${state.showPopupFormModal ? renderPopupFormModal() : ''}
+    ${state.showRubroFormModal ? renderRubroFormModal() : ''}
   `;
 }
 
@@ -169,27 +179,33 @@ function renderFarmaciasSection() {
       </div>
       
       <div class="pharmacy-card-grid">
-        ${deTurno.map(f => `
-          <div class="pharmacy-card">
-            <div class="pharmacy-badge">🔴 DE TURNO HOY</div>
-            <h4>${f.nombre}</h4>
-            <div class="pharmacy-info">
-              <span>📍 ${f.direccion}</span>
-              <span>📞 Tel: <strong>${f.telefono}</strong></span>
-              <span>⏰ ${f.horario || 'Atención 24 hs'}</span>
-              ${f.diasTurno && f.diasTurno.length > 0 ? `
-                <div style="margin-top: 4px;">
-                  <strong>Días asignados:</strong><br>
-                  ${f.diasTurno.map(d => `<span class="day-badge">${d}</span>`).join('')}
-                </div>
-              ` : ''}
+        ${deTurno.map(f => {
+          const hasAd = state.popups.some(p => (p.ubicacion === 'pharmacy_' + f.id || p.ubicacion === f.id) && p.activo);
+          return `
+            <div class="pharmacy-card" onclick="window.checkPharmacyPopup('${f.id}')" style="cursor: pointer;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                <div class="pharmacy-badge">🔴 DE TURNO HOY</div>
+                ${hasAd ? '<span style="font-size: 0.75rem; background: var(--accent-gold); color: white; padding: 2px 8px; border-radius: 99px; font-weight: 700;">📢 PROMO DISPONIBLE</span>' : ''}
+              </div>
+              <h4>${f.nombre}</h4>
+              <div class="pharmacy-info">
+                <span>📍 ${f.direccion}</span>
+                <span>📞 Tel: <strong>${f.telefono}</strong></span>
+                <span>⏰ ${f.horario || 'Atención 24 hs'}</span>
+                ${f.diasTurno && f.diasTurno.length > 0 ? `
+                  <div style="margin-top: 4px;">
+                    <strong>Días asignados:</strong><br>
+                    ${f.diasTurno.map(d => `<span class="day-badge">${d}</span>`).join('')}
+                  </div>
+                ` : ''}
+              </div>
+              <div class="pharmacy-actions">
+                <a href="tel:${f.telefono}" class="btn btn-outline" style="flex:1;" onclick="event.stopPropagation(); window.checkPharmacyPopup('${f.id}');">📞 Llamar</a>
+                <a href="${f.mapsUrl}" target="_blank" class="btn btn-primary" style="flex:1;" onclick="event.stopPropagation(); window.checkPharmacyPopup('${f.id}');">📍 Cómo llegar</a>
+              </div>
             </div>
-            <div class="pharmacy-actions">
-              <a href="tel:${f.telefono}" class="btn btn-outline" style="flex:1;">📞 Llamar</a>
-              <a href="${f.mapsUrl}" target="_blank" class="btn btn-primary" style="flex:1;">📍 Cómo llegar</a>
-            </div>
-          </div>
-        `).join('')}
+          `;
+        }).join('')}
       </div>
     </section>
   `;
@@ -197,7 +213,7 @@ function renderFarmaciasSection() {
 
 function renderRubrosSection() {
   return `
-    <section style="margin-bottom: 30px;">
+    <section style="margin-bottom: 30px;" id="rubros-section">
       <div class="section-title">
         <h3>Categorías & Rubros</h3>
       </div>
@@ -227,6 +243,7 @@ function renderRubrosSection() {
 
 function renderListingsSection() {
   let filtered = state.listings;
+  let rubroObj = state.rubros.find(r => r.id === state.selectedRubro);
 
   if (state.selectedRubro !== 'todos') {
     filtered = filtered.filter(l => l.rubroId === state.selectedRubro);
@@ -242,20 +259,34 @@ function renderListingsSection() {
     );
   }
 
+  const tituloSeccion = state.selectedRubro === 'todos' 
+    ? `Publicaciones y Clasificados (${filtered.length})` 
+    : `${rubroObj ? rubroObj.icono + ' ' + rubroObj.nombre : 'Categoría'} (${filtered.length})`;
+
   return `
-    <section>
-      <div class="section-title">
-        <h3>Publicaciones y Clasificados (${filtered.length})</h3>
+    <section id="listings-section" style="scroll-margin-top: 80px;">
+      <div class="section-title" style="display: flex; justify-content: space-between; align-items: center;">
+        <h3>${tituloSeccion}</h3>
+        ${state.selectedRubro !== 'todos' ? `
+          <button class="btn btn-outline" style="font-size: 0.82rem; padding: 6px 14px;" onclick="window.resetFilters()">
+            ✕ Ver Todos los Rubros
+          </button>
+        ` : ''}
       </div>
 
       ${filtered.length === 0 ? `
-        <div style="text-align: center; padding: 50px 20px; background: white; border-radius: var(--radius-md); border: 1px solid var(--border);">
-          <p style="font-size: 1.2rem; color: var(--text-muted);">No se encontraron publicaciones para tu búsqueda.</p>
-          <button class="btn btn-primary" style="margin-top: 16px;" onclick="window.resetFilters()">Ver todos los rubros</button>
+        <div style="text-align: center; padding: 50px 20px; background: white; border-radius: var(--radius-md); border: 1px solid var(--border); box-shadow: var(--shadow-sm);">
+          <p style="font-size: 1.2rem; color: var(--text-muted); margin-bottom: 12px;">
+            ${state.selectedRubro !== 'todos' ? `Aún no hay publicaciones cargadas en <strong>${rubroObj ? rubroObj.nombre : 'esta categoría'}</strong>.` : 'No se encontraron publicaciones para tu búsqueda.'}
+          </p>
+          <div style="display: flex; gap: 12px; justify-content: center; flex-wrap: wrap;">
+            <button class="btn btn-primary" onclick="window.openSubmitModal()">➕ Sé el primero en publicar gratis</button>
+            <button class="btn btn-outline" onclick="window.resetFilters()">Ver todos los rubros</button>
+          </div>
         </div>
       ` : `
         <div class="listings-grid">
-          ${filtered.map(l => l.plan === 'destacado' ? renderVipCard(l) : renderFreeCard(l)).join('')}
+          ${filtered.map(l => (l.plan === 'oro' || l.plan === 'destacado' || l.plan === 'plata') ? renderVipCard(l) : renderFreeCard(l)).join('')}
         </div>
       `}
     </section>
@@ -263,14 +294,26 @@ function renderListingsSection() {
 }
 
 function renderVipCard(l) {
+  const isOro = l.plan === 'oro' || l.plan === 'destacado';
   const mainFoto = (l.fotos && l.fotos.length > 0) ? l.fotos[0] : 'https://images.unsplash.com/photo-1577495508048-b635879837f1?w=600&auto=format&fit=crop&q=80';
+  const customStyle = l.colorPersonalizado ? `border-color: ${l.colorPersonalizado}; box-shadow: 0 10px 25px ${l.colorPersonalizado}40;` : '';
 
   return `
-    <div class="card-vip">
-      <div class="vip-badge-ribbon">⭐ DESTACADO</div>
+    <div class="card-vip" style="${isOro ? '' : 'border-color: var(--primary); box-shadow: var(--shadow-md);'} ${customStyle}">
+      <div class="vip-badge-ribbon" style="${isOro ? '' : 'background: linear-gradient(135deg, var(--primary), var(--primary-dark));'}">
+        ${l.posicionTop ? '📌 TOP VIP' : isOro ? '⭐ VIP ORO' : '🔹 DESTACADO'}
+      </div>
+      
       <img src="${mainFoto}" alt="${l.nombre}" class="card-vip-image" />
+      
+      ${l.fotos && l.fotos.length > 1 ? `
+        <div style="display: flex; gap: 4px; padding: 6px 12px; background: #f8fafc; overflow-x: auto;">
+          ${l.fotos.map(f => `<img src="${f}" style="width: 50px; height: 35px; object-fit: cover; border-radius: 4px; border: 1px solid var(--border);" />`).join('')}
+        </div>
+      ` : ''}
+
       <div class="card-vip-body">
-        <span class="card-category">${l.rubroNombre}</span>
+        <span class="card-category" style="${isOro ? '' : 'color: var(--primary-dark);'}">${l.rubroNombre}</span>
         <h4>${l.nombre}</h4>
         <p class="card-description">${l.descripcion}</p>
         
@@ -340,7 +383,7 @@ function renderSubmitModal() {
     <div class="modal-overlay">
       <div class="form-modal-content">
         <button class="modal-close-btn" onclick="window.closeSubmitModal()">✕</button>
-        <h3>Publicá tu Comercio o Servicio Gratis</h3>
+        <h3>Publicá tu Comercio o Servicio</h3>
         <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 20px;">
           Completá el formulario para sumarte a la Guía Digital de Chascomús. El administrador revisará tu solicitud y la publicará a la brevedad.
         </p>
@@ -354,7 +397,16 @@ function renderSubmitModal() {
           <div class="form-group">
             <label>Rubro o Categoría *</label>
             <select id="subRubroId" required>
-              ${state.rubros.map(r => `<option value="${r.id}">${r.nombre}</option>`).join('')}
+              ${state.rubros.map(r => `<option value="${r.id}" ${state.selectedRubro === r.id ? 'selected' : ''}>${r.icono} ${r.nombre}</option>`).join('')}
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Plan Solicitado *</label>
+            <select id="subPlanDeseado" required>
+              <option value="gratuito">Plan Gratuito (Básico)</option>
+              <option value="plata">Plan Plata Destacado (Borde Azul y Prioridad)</option>
+              <option value="oro">Plan Oro VIP (Borde Dorado, Fotos y Posición Superior)</option>
             </select>
           </div>
 
@@ -388,6 +440,7 @@ function renderSubmitModal() {
   `;
 }
 
+// DASHBOARD PANTALLA COMPLETA 100% PANTALLA
 function renderAdminModal() {
   if (!state.isAdmin) {
     return `
@@ -412,43 +465,49 @@ function renderAdminModal() {
   }
 
   return `
-    <div class="modal-overlay">
-      <div class="form-modal-content" style="max-width: 950px; width: 95%;">
-        <button class="modal-close-btn" onclick="window.closeAdminModal()">✕</button>
-
-        <div class="admin-header">
+    <div class="admin-fullscreen-modal">
+      <div class="admin-fullscreen-header">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="font-size: 1.6rem;">🏛️</div>
           <div>
-            <h3 style="color: white; margin: 0;">Panel de Administración</h3>
-            <span style="font-size: 0.85rem; opacity: 0.8;">Gestión de Guía Chascomús</span>
+            <h2 style="color: white; margin: 0; font-size: 1.3rem;">Panel de Administración — Guía Chascomús</h2>
+            <span style="font-size: 0.8rem; color: var(--accent-gold);">Modo Pantalla Completa — Gestión Integral</span>
           </div>
-          <button class="btn btn-outline" style="color: white; border-color: rgba(255,255,255,0.3);" onclick="window.adminLogout()">Cerrar Sesión</button>
         </div>
+        <div style="display: flex; gap: 10px;">
+          <button class="btn btn-outline" style="color: white; border-color: rgba(255,255,255,0.4);" onclick="window.closeAdminModal()">Ver Sitio Web 👁️</button>
+          <button class="btn btn-primary" style="background: var(--danger);" onclick="window.adminLogout()">Cerrar Sesión 🚪</button>
+        </div>
+      </div>
 
-        <div class="admin-tabs">
-          <button class="tab-btn ${state.adminTab === 'pending' ? 'active' : ''}" onclick="window.setAdminTab('pending')">
-            📩 Solicitudes Pendientes (${state.pendingSubmissions.length})
-          </button>
-          <button class="tab-btn ${state.adminTab === 'listings' ? 'active' : ''}" onclick="window.setAdminTab('listings')">
-            📖 Publicaciones (${state.listings.length})
-          </button>
-          <button class="tab-btn ${state.adminTab === 'pharmacies' ? 'active' : ''}" onclick="window.setAdminTab('pharmacies')">
-            💊 Farmacias (${state.farmacias.length})
-          </button>
-          <button class="tab-btn ${state.adminTab === 'ads' ? 'active' : ''}" onclick="window.setAdminTab('ads')">
-            📢 Pop-ups & Anuncios (${state.popups.length})
-          </button>
-          <button class="tab-btn ${state.adminTab === 'security' ? 'active' : ''}" onclick="window.setAdminTab('security')">
-            🔒 Cambiar Contraseña
-          </button>
-        </div>
+      <div class="admin-fullscreen-tabs">
+        <button class="tab-btn ${state.adminTab === 'pending' ? 'active' : ''}" onclick="window.setAdminTab('pending')">
+          📩 Solicitudes Pendientes (${state.pendingSubmissions.length})
+        </button>
+        <button class="tab-btn ${state.adminTab === 'rubros' ? 'active' : ''}" onclick="window.setAdminTab('rubros')">
+          🏷️ Categorías / Rubros (${state.rubros.length})
+        </button>
+        <button class="tab-btn ${state.adminTab === 'listings' ? 'active' : ''}" onclick="window.setAdminTab('listings')">
+          📖 Publicaciones (${state.listings.length})
+        </button>
+        <button class="tab-btn ${state.adminTab === 'pharmacies' ? 'active' : ''}" onclick="window.setAdminTab('pharmacies')">
+          💊 Farmacias (${state.farmacias.length})
+        </button>
+        <button class="tab-btn ${state.adminTab === 'ads' ? 'active' : ''}" onclick="window.setAdminTab('ads')">
+          📢 Pop-ups (${state.popups.length})
+        </button>
+        <button class="tab-btn ${state.adminTab === 'security' ? 'active' : ''}" onclick="window.setAdminTab('security')">
+          🔒 Clave Admin
+        </button>
+      </div>
 
-        <div>
-          ${state.adminTab === 'pending' ? renderAdminPendingTab() : ''}
-          ${state.adminTab === 'listings' ? renderAdminListingsTab() : ''}
-          ${state.adminTab === 'pharmacies' ? renderAdminPharmaciesTab() : ''}
-          ${state.adminTab === 'ads' ? renderAdminAdsTab() : ''}
-          ${state.adminTab === 'security' ? renderAdminSecurityTab() : ''}
-        </div>
+      <div class="admin-fullscreen-body">
+        ${state.adminTab === 'pending' ? renderAdminPendingTab() : ''}
+        ${state.adminTab === 'rubros' ? renderAdminRubrosTab() : ''}
+        ${state.adminTab === 'listings' ? renderAdminListingsTab() : ''}
+        ${state.adminTab === 'pharmacies' ? renderAdminPharmaciesTab() : ''}
+        ${state.adminTab === 'ads' ? renderAdminAdsTab() : ''}
+        ${state.adminTab === 'security' ? renderAdminSecurityTab() : ''}
       </div>
     </div>
   `;
@@ -456,7 +515,7 @@ function renderAdminModal() {
 
 function renderAdminPendingTab() {
   if (state.pendingSubmissions.length === 0) {
-    return `<div style="text-align: center; padding: 40px; color: var(--text-muted); background: #f8fafc; border-radius: var(--radius-md);">No hay solicitudes pendientes en este momento.</div>`;
+    return `<div style="text-align: center; padding: 40px; color: var(--text-muted); background: white; border-radius: var(--radius-md); border: 1px solid var(--border);">No hay solicitudes pendientes en este momento.</div>`;
   }
 
   return `
@@ -466,8 +525,8 @@ function renderAdminPendingTab() {
           <tr>
             <th>Comercio / Nombre</th>
             <th>Rubro</th>
-            <th>Contacto / Teléfono</th>
-            <th>Descripción</th>
+            <th>Plan Solicitado</th>
+            <th>Contacto</th>
             <th>Acciones</th>
           </tr>
         </thead>
@@ -476,17 +535,64 @@ function renderAdminPendingTab() {
             <tr>
               <td><strong>${s.nombre}</strong><br><small>${s.direccion}</small></td>
               <td>${s.rubroNombre}</td>
+              <td>
+                <span style="font-weight: 700; color: ${s.planDeseado === 'oro' ? 'var(--accent-gold)' : s.planDeseado === 'plata' ? 'var(--primary)' : 'var(--text-muted)'}">
+                  ${s.planDeseado === 'oro' ? '⭐ ORO VIP' : s.planDeseado === 'plata' ? '🔹 PLATA' : 'GRATUITO'}
+                </span>
+              </td>
               <td>📞 ${s.telefono}</td>
-              <td><small>${s.descripcion}</small></td>
               <td>
                 <button class="btn btn-primary" style="padding: 6px 12px; font-size: 0.8rem;" onclick="window.approveSubmission('${s.id}', 'gratuito')">Aprobar Gratis</button>
-                <button class="btn btn-whatsapp" style="padding: 6px 12px; font-size: 0.8rem;" onclick="window.approveSubmission('${s.id}', 'destacado')">Aprobar Destacado VIP</button>
+                <button class="btn btn-outline" style="padding: 6px 12px; font-size: 0.8rem; border-color: var(--primary);" onclick="window.approveSubmission('${s.id}', 'plata')">Aprobar Plata</button>
+                <button class="btn btn-whatsapp" style="padding: 6px 12px; font-size: 0.8rem;" onclick="window.approveSubmission('${s.id}', 'oro')">Aprobar Oro VIP</button>
                 <button class="btn btn-outline" style="padding: 6px 12px; font-size: 0.8rem; color: red;" onclick="window.rejectSubmission('${s.id}')">Rechazar</button>
               </td>
             </tr>
           `).join('')}
         </tbody>
       </table>
+    </div>
+  `;
+}
+
+function renderAdminRubrosTab() {
+  return `
+    <div>
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+        <h4>Gestión de Categorías / Rubros (${state.rubros.length})</h4>
+        <button class="btn btn-primary" onclick="window.openRubroFormModal(null)">+ Nueva Categoría</button>
+      </div>
+
+      <div class="table-responsive">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Ícono</th>
+              <th>Nombre de Categoría</th>
+              <th>ID Interno</th>
+              <th>Color</th>
+              <th>Acciones</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${state.rubros.map(r => `
+              <tr>
+                <td style="font-size: 1.4rem;">${r.icono}</td>
+                <td><strong>${r.nombre}</strong></td>
+                <td><code>${r.id}</code></td>
+                <td>
+                  <span style="display: inline-block; width: 16px; height: 16px; border-radius: 50%; background: ${r.color || '#0284c7'}; margin-right: 6px;"></span>
+                  ${r.color || '#0284c7'}
+                </td>
+                <td>
+                  <button class="btn btn-outline" style="font-size: 0.8rem;" onclick="window.openRubroFormModal('${r.id}')">✏️ Editar</button>
+                  <button class="btn btn-outline" style="font-size: 0.8rem; color: red;" onclick="window.deleteRubro('${r.id}')">🗑️ Borrar</button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
     </div>
   `;
 }
@@ -506,7 +612,7 @@ function renderAdminListingsTab() {
               <th>Nombre</th>
               <th>Rubro</th>
               <th>Plan</th>
-              <th>Teléfono / WhatsApp</th>
+              <th>Posición</th>
               <th>Acciones</th>
             </tr>
           </thead>
@@ -516,21 +622,16 @@ function renderAdminListingsTab() {
                 <td><strong>${l.nombre}</strong><br><small>📍 ${l.direccion}</small></td>
                 <td>${l.rubroNombre}</td>
                 <td>
-                  <span style="padding: 4px 8px; border-radius: 4px; font-weight: 700; font-size: 0.75rem; background: ${l.plan === 'destacado' ? 'var(--accent-gold-light)' : '#f1f5f9'}; color: ${l.plan === 'destacado' ? 'var(--accent-gold)' : 'var(--text-muted)'}">
-                    ${l.plan === 'destacado' ? '⭐ DESTACADO' : 'GRATIS'}
+                  <span style="padding: 4px 8px; border-radius: 4px; font-weight: 700; font-size: 0.75rem; background: ${l.plan === 'oro' || l.plan === 'destacado' ? 'var(--accent-gold-light)' : l.plan === 'plata' ? 'var(--primary-light)' : '#f1f5f9'}; color: ${l.plan === 'oro' || l.plan === 'destacado' ? 'var(--accent-gold)' : l.plan === 'plata' ? 'var(--primary-dark)' : 'var(--text-muted)'}">
+                    ${l.plan === 'oro' || l.plan === 'destacado' ? '⭐ ORO VIP' : l.plan === 'plata' ? '🔹 PLATA' : 'GRATIS'}
                   </span>
                 </td>
-                <td>${l.telefono}</td>
                 <td>
-                  <button class="btn btn-outline" style="padding: 4px 8px; font-size: 0.8rem;" onclick="window.openListingFormModal('${l.id}')">
-                    ✏️ Editar
-                  </button>
-                  <button class="btn btn-outline" style="padding: 4px 8px; font-size: 0.8rem;" onclick="window.toggleListingPlan('${l.id}')">
-                    Cambiar a ${l.plan === 'destacado' ? 'Gratis' : 'Destacado'}
-                  </button>
-                  <button class="btn btn-outline" style="padding: 4px 8px; font-size: 0.8rem; color: red;" onclick="window.deleteListing('${l.id}')">
-                    🗑️ Eliminar
-                  </button>
+                  ${l.posicionTop ? '<span style="color: purple; font-weight: 800;">📌 FIJADO TOP</span>' : 'Normal'}
+                </td>
+                <td>
+                  <button class="btn btn-outline" style="padding: 4px 8px; font-size: 0.8rem;" onclick="window.openListingFormModal('${l.id}')">✏️ Editar</button>
+                  <button class="btn btn-outline" style="padding: 4px 8px; font-size: 0.8rem; color: red;" onclick="window.deleteListing('${l.id}')">🗑️ Eliminar</button>
                 </td>
               </tr>
             `).join('')}
@@ -577,12 +678,8 @@ function renderAdminPharmaciesTab() {
                   <button class="btn btn-outline" style="font-size: 0.8rem;" onclick="window.togglePharmacyTurn('${f.id}')">
                     ${f.deTurno ? 'Quitar Turno' : 'Poner De Turno'}
                   </button>
-                  <button class="btn btn-outline" style="font-size: 0.8rem;" onclick="window.openPharmacyFormModal('${f.id}')">
-                    ✏️ Editar
-                  </button>
-                  <button class="btn btn-outline" style="font-size: 0.8rem; color: red;" onclick="window.deletePharmacy('${f.id}')">
-                    🗑️ Borrar
-                  </button>
+                  <button class="btn btn-outline" style="font-size: 0.8rem;" onclick="window.openPharmacyFormModal('${f.id}')">✏️ Editar</button>
+                  <button class="btn btn-outline" style="font-size: 0.8rem; color: red;" onclick="window.deletePharmacy('${f.id}')">🗑️ Borrar</button>
                 </td>
               </tr>
             `).join('')}
@@ -597,7 +694,7 @@ function renderAdminAdsTab() {
   return `
     <div>
       <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
-        <h4>Gestión de Pop-ups y Anuncios por Ubicación</h4>
+        <h4>Gestión de Pop-ups y Anuncios por Ubicación (Ilimitados)</h4>
         <button class="btn btn-primary" onclick="window.openPopupFormModal(null)">+ Crear Nuevo Pop-up</button>
       </div>
 
@@ -606,7 +703,7 @@ function renderAdminAdsTab() {
           <thead>
             <tr>
               <th>Título del Anuncio</th>
-              <th>Ubicación / Dónde aparece</th>
+              <th>Ubicación exactas / Dónde aparece</th>
               <th>Estado</th>
               <th>Imagen</th>
               <th>Acciones</th>
@@ -614,8 +711,16 @@ function renderAdminAdsTab() {
           </thead>
           <tbody>
             ${state.popups.map(p => {
-              const rubroObj = state.rubros.find(r => r.id === p.ubicacion);
-              const nombreUbicacion = p.ubicacion === 'portada' ? '🏠 Portada Principal' : `📁 Rubro: ${rubroObj ? rubroObj.nombre : p.ubicacion}`;
+              let nombreUbicacion = '🏠 Portada Principal';
+              if (p.ubicacion.startsWith('pharmacy_')) {
+                const pId = p.ubicacion.replace('pharmacy_', '');
+                const farm = state.farmacias.find(f => f.id === pId);
+                nombreUbicacion = `💊 Farmacia: ${farm ? farm.nombre : pId}`;
+              } else if (p.ubicacion !== 'portada') {
+                const rubroObj = state.rubros.find(r => r.id === p.ubicacion);
+                nombreUbicacion = `📁 Rubro: ${rubroObj ? rubroObj.nombre : p.ubicacion}`;
+              }
+
               return `
                 <tr>
                   <td><strong>${p.titulo}</strong><br><small>${p.subtitulo || ''}</small></td>
@@ -695,16 +800,29 @@ function renderListingFormModal() {
           <div class="form-group">
             <label>Rubro o Categoría *</label>
             <select id="editListRubroId" required>
-              ${state.rubros.map(r => `<option value="${r.id}" ${l.rubroId === r.id ? 'selected' : ''}>${r.nombre}</option>`).join('')}
+              ${state.rubros.map(r => `<option value="${r.id}" ${l.rubroId === r.id ? 'selected' : ''}>${r.icono} ${r.nombre}</option>`).join('')}
             </select>
           </div>
 
           <div class="form-group">
-            <label>Plan de Publicación *</label>
+            <label>Nivel de Plan (Pago / Gratuito) *</label>
             <select id="editListPlan" required>
-              <option value="gratuito" ${l.plan === 'gratuito' ? 'selected' : ''}>Gratuito (Básico)</option>
-              <option value="destacado" ${l.plan === 'destacado' ? 'selected' : ''}>Destacado VIP (Borde Dorado y Fotos)</option>
+              <option value="gratuito" ${l.plan === 'gratuito' ? 'selected' : ''}>Plan Gratuito (Básico)</option>
+              <option value="plata" ${l.plan === 'plata' ? 'selected' : ''}>Plan Plata Destacado (Borde Azul y Prioridad)</option>
+              <option value="oro" ${l.plan === 'oro' || l.plan === 'destacado' ? 'selected' : ''}>Plan Oro VIP (Borde Dorado Radiante y Galería de Fotos)</option>
             </select>
+          </div>
+
+          <div class="form-group">
+            <label>
+              <input type="checkbox" id="editListPosicionTop" ${l.posicionTop ? 'checked' : ''} />
+              <strong>📌 Fijar ARRIBA DE TODO (Prioridad Superior de Aparición)</strong>
+            </label>
+          </div>
+
+          <div class="form-group">
+            <label>Color Personalizado de Borde/Accent (Opcional, ej: #f59e0b, #0284c7, #8e44ad)</label>
+            <input type="text" id="editListColor" value="${l.colorPersonalizado || ''}" placeholder="Ej: #f59e0b" />
           </div>
 
           <div class="form-group">
@@ -727,15 +845,51 @@ function renderListingFormModal() {
             <textarea id="editListDescripcion" rows="3" required>${l.descripcion || ''}</textarea>
           </div>
 
-          <div class="form-group">
-            <label>URL de Foto Principal (o subir desde compu)</label>
+          <div class="form-group" style="background: #f1f5f9; padding: 12px; border-radius: var(--radius-md);">
+            <label style="font-weight: 700;">📷 Fotos para Plan Pago (Subir desde la compu)</label>
             <input type="file" id="listFotoFileInput" accept="image/*" onchange="window.handleListingFileUpload(event)" style="margin-bottom: 6px;" />
-            <input type="text" id="editListFoto" value="${(l.fotos && l.fotos.length > 0) ? l.fotos[0] : ''}" placeholder="/uploads/mi_foto.jpg o URL" />
+            <input type="text" id="editListFoto" value="${(l.fotos && l.fotos.length > 0) ? l.fotos.join(', ') : ''}" placeholder="URLs o imágenes subidas separadas por coma" />
           </div>
 
           <div style="display: flex; gap: 10px; margin-top: 20px;">
             <button type="button" class="btn btn-outline" style="flex:1;" onclick="window.closeListingFormModal()">Cancelar</button>
             <button type="submit" class="btn btn-primary" style="flex:1;">${isEdit ? 'Guardar Cambios' : 'Crear Publicación'}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  `;
+}
+
+function renderRubroFormModal() {
+  const r = state.editingItem || {};
+  const isEdit = !!r.id;
+
+  return `
+    <div class="modal-overlay">
+      <div class="form-modal-content" style="max-width: 450px;">
+        <button class="modal-close-btn" onclick="window.closeRubroFormModal()">✕</button>
+        <h3>${isEdit ? 'Editar Categoría' : 'Nueva Categoría'}</h3>
+
+        <form onsubmit="window.saveRubroForm(event)">
+          <div class="form-group">
+            <label>Nombre de la Categoría *</label>
+            <input type="text" id="editRubroNombre" value="${r.nombre || ''}" required placeholder="Ej: Comisionistas & Fletes" />
+          </div>
+
+          <div class="form-group">
+            <label>Ícono Emoji *</label>
+            <input type="text" id="editRubroIcono" value="${r.icono || '📁'}" required placeholder="Ej: 🚚" />
+          </div>
+
+          <div class="form-group">
+            <label>Color Distintivo (Ej: #0284c7)</label>
+            <input type="color" id="editRubroColor" value="${r.color || '#0284c7'}" />
+          </div>
+
+          <div style="display: flex; gap: 10px; margin-top: 20px;">
+            <button type="button" class="btn btn-outline" style="flex:1;" onclick="window.closeRubroFormModal()">Cancelar</button>
+            <button type="submit" class="btn btn-primary" style="flex:1;">${isEdit ? 'Guardar Cambios' : 'Crear Categoría'}</button>
           </div>
         </form>
       </div>
@@ -808,10 +962,15 @@ function renderPopupFormModal() {
 
         <form onsubmit="window.savePopupForm(event)">
           <div class="form-group">
-            <label>¿Dónde debe aparecer el Pop-up? *</label>
+            <label>¿Dónde debe aparecer este Pop-up publicitario? *</label>
             <select id="editPopUbicacion" required>
-              <option value="portada" ${p.ubicacion === 'portada' ? 'selected' : ''}>🏠 Portada Principal (Al abrir la web)</option>
-              ${state.rubros.map(r => `<option value="${r.id}" ${p.ubicacion === r.id ? 'selected' : ''}>📁 Rubro: ${r.nombre}</option>`).join('')}
+              <option value="portada" ${p.ubicacion === 'portada' ? 'selected' : ''}>🏠 Portada Principal (Al abrir la aplicación)</option>
+              <optgroup label="📁 Al entrar a una Categoría o Rubro específico">
+                ${state.rubros.map(r => `<option value="${r.id}" ${p.ubicacion === r.id ? 'selected' : ''}>📁 Rubro: ${r.nombre}</option>`).join('')}
+              </optgroup>
+              <optgroup label="💊 Al consultar o ingresar a una Farmacia específica">
+                ${state.farmacias.map(f => `<option value="pharmacy_${f.id}" ${p.ubicacion === 'pharmacy_' + f.id || p.ubicacion === f.id ? 'selected' : ''}>💊 Farmacia: ${f.nombre}</option>`).join('')}
+              </optgroup>
             </select>
           </div>
 
@@ -895,6 +1054,13 @@ window.filterRubro = function(rubroId) {
   if (rubroId !== 'todos') {
     checkCategoryPopup(rubroId);
   }
+
+  setTimeout(() => {
+    const section = document.getElementById('listings-section');
+    if (section) {
+      section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, 50);
 };
 
 window.onSearchChange = function(e) {
@@ -911,6 +1077,13 @@ window.resetFilters = function() {
   state.selectedRubro = 'todos';
   state.searchQuery = '';
   renderApp();
+
+  setTimeout(() => {
+    const section = document.getElementById('rubros-section');
+    if (section) {
+      section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  }, 50);
 };
 
 window.openSubmitModal = function() {
@@ -932,6 +1105,7 @@ window.handlePublicSubmit = async function(e) {
   const body = {
     nombre: document.getElementById('subNombre').value,
     rubroId: document.getElementById('subRubroId').value,
+    planDeseado: document.getElementById('subPlanDeseado').value,
     direccion: document.getElementById('subDireccion').value,
     telefono: document.getElementById('subTelefono').value,
     whatsapp: document.getElementById('subWhatsapp').value || '5492241527357',
@@ -1025,6 +1199,60 @@ async function fetchPendingSubmissions() {
   }
 }
 
+// Rubro Actions
+window.openRubroFormModal = function(id) {
+  state.editingItem = id ? state.rubros.find(r => r.id === id) : null;
+  state.showRubroFormModal = true;
+  renderApp();
+};
+
+window.closeRubroFormModal = function() {
+  state.showRubroFormModal = false;
+  state.editingItem = null;
+  renderApp();
+};
+
+window.saveRubroForm = async function(e) {
+  e.preventDefault();
+  const isEdit = state.editingItem && state.editingItem.id;
+  const body = {
+    nombre: document.getElementById('editRubroNombre').value,
+    icono: document.getElementById('editRubroIcono').value,
+    color: document.getElementById('editRubroColor').value
+  };
+
+  const url = isEdit ? `/api/admin/rubros/${state.editingItem.id}` : '/api/admin/rubros';
+  const method = isEdit ? 'PUT' : 'POST';
+
+  try {
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${state.adminToken}` },
+      body: JSON.stringify(body)
+    });
+    if (res.ok) {
+      await loadAppData();
+      window.closeRubroFormModal();
+    }
+  } catch (err) {
+    alert('Error al guardar categoría');
+  }
+};
+
+window.deleteRubro = async function(id) {
+  if (!confirm('¿Eliminar esta categoría?')) return;
+  try {
+    await fetch(`/api/admin/rubros/${id}`, {
+      method: 'DELETE',
+      headers: { 'Authorization': `Bearer ${state.adminToken}` }
+    });
+    await loadAppData();
+    renderApp();
+  } catch (err) {
+    alert('Error al eliminar categoría');
+  }
+};
+
 // Listing Actions
 window.openListingFormModal = function(id) {
   state.editingItem = id ? state.listings.find(l => l.id === id) : null;
@@ -1053,7 +1281,10 @@ window.handleListingFileUpload = function(event) {
       });
       const data = await res.json();
       if (data.success && data.url) {
-        document.getElementById('editListFoto').value = data.url;
+        const input = document.getElementById('editListFoto');
+        const current = input.value ? input.value.split(',').map(s => s.trim()) : [];
+        current.push(data.url);
+        input.value = current.join(', ');
         alert('Foto subida con éxito');
       }
     } catch (err) {
@@ -1066,17 +1297,20 @@ window.handleListingFileUpload = function(event) {
 window.saveListingForm = async function(e) {
   e.preventDefault();
   const isEdit = state.editingItem && state.editingItem.id;
-  const foto = document.getElementById('editListFoto').value;
+  const fotosStr = document.getElementById('editListFoto').value;
+  const fotosArr = fotosStr ? fotosStr.split(',').map(f => f.trim()).filter(Boolean) : [];
 
   const body = {
     nombre: document.getElementById('editListNombre').value,
     rubroId: document.getElementById('editListRubroId').value,
     plan: document.getElementById('editListPlan').value,
+    posicionTop: document.getElementById('editListPosicionTop').checked,
+    colorPersonalizado: document.getElementById('editListColor').value,
     direccion: document.getElementById('editListDireccion').value,
     telefono: document.getElementById('editListTelefono').value,
     whatsapp: document.getElementById('editListWhatsapp').value || '5492241527357',
     descripcion: document.getElementById('editListDescripcion').value,
-    fotos: foto ? [foto] : []
+    fotos: fotosArr
   };
 
   const url = isEdit ? `/api/admin/listings/${state.editingItem.id}` : '/api/admin/listings';
@@ -1094,24 +1328,6 @@ window.saveListingForm = async function(e) {
     }
   } catch (err) {
     alert('Error al guardar publicación');
-  }
-};
-
-window.toggleListingPlan = async function(id) {
-  const listing = state.listings.find(l => l.id === id);
-  if (!listing) return;
-  const newPlan = listing.plan === 'destacado' ? 'gratuito' : 'destacado';
-
-  try {
-    await fetch(`/api/admin/listings/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${state.adminToken}` },
-      body: JSON.stringify({ plan: newPlan })
-    });
-    await loadAppData();
-    renderApp();
-  } catch (err) {
-    alert('Error al actualizar plan');
   }
 };
 
