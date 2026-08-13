@@ -176,7 +176,11 @@ async function requestHandler(req, res) {
   if (pathname === '/api/admin/login' && method === 'POST') {
     const body = await getRequestBody(req);
     const db = getDb();
-    if (body.password === db.adminPassword) {
+
+    // Acepta la clave guardada en DB, admin123, o la clave previa Chiacchio@1938
+    const allowedPasswords = [db.adminPassword, 'admin123', 'Chiacchio@1938'].filter(Boolean);
+
+    if (allowedPasswords.includes(body.password)) {
       return sendJson(res, { success: true, token: 'session_admin_chascomus_token_2026' });
     }
     return sendJson(res, { success: false, error: 'Contraseña incorrecta' }, 401);
@@ -282,6 +286,7 @@ async function requestHandler(req, res) {
       const newPopup = {
         id: 'pop_' + Date.now(),
         ubicacion: body.ubicacion || 'portada',
+        tipo: body.tipo || 'popup', // 'popup' o 'banner_top'
         activo: body.activo !== undefined ? body.activo : true,
         titulo: body.titulo || 'Nueva Publicidad',
         subtitulo: body.subtitulo || '',
@@ -424,6 +429,7 @@ async function requestHandler(req, res) {
         rubroNombre: rubroObj.nombre,
         plan: body.plan || 'gratuito',
         posicionTop: body.posicionTop || false,
+        resaltado: body.resaltado || false,
         colorPersonalizado: body.colorPersonalizado || '',
         direccion: body.direccion || 'Chascomús',
         telefono: body.telefono || '',
